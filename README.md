@@ -1,16 +1,110 @@
-## Hi there 👋
+# 안산동산고 디지털 위키
 
-<!--
-**AnsanDongsanWiki/AnsanDongsanWiki** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
+학생이 기록하고, 공유하며, 이어가는 학교 정보 플랫폼
 
-Here are some ideas to get you started:
+---
 
-- 🔭 I’m currently working on ...
-- 🌱 I’m currently learning ...
-- 👯 I’m looking to collaborate on ...
-- 🤔 I’m looking for help with ...
-- 💬 Ask me about ...
-- 📫 How to reach me: ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
--->
+## 프로젝트 소개
+
+안산동산고 학생들이 학교생활에 필요한 정보를 쉽고 빠르게 찾을 수 있도록 돕기 위해 제작하는 학생 주도 디지털 위키 프로젝트입니다.
+
+공식 홈페이지를 대체하는 것이 아니라, 학생들이 실제로 궁금해하는 학교생활 정보, 동아리 정보, 신입생 가이드, FAQ 등을 정리하여 정보 접근성을 높이는 것을 목표로 합니다.
+
+---
+
+## 프로젝트 목표
+
+- 학교생활 정보 공유
+- 신입생 적응 지원
+- 학교 기록 보존
+- 학생 공동체 활성화
+- 지속 가능한 학생 주도 플랫폼 구축
+
+---
+
+## 운영 방식
+
+학생
+↓
+구글폼을 통한 제안 및 수정 요청
+↓
+운영진 검토
+↓
+위키 반영
+
+※ 학생 누구나 제안 가능
+※ 운영진 검토 후 게시
+
+---
+
+## 주요 콘텐츠
+
+### 학교소개
+- 학교 역사
+- 교육 이념
+- 학교 시설
+
+### 학교생활
+- 교복
+- 기숙사
+- 학교생활 팁
+
+### 동아리
+- 동아리 소개
+- 활동 내용
+- 모집 정보
+
+### 학생회
+- 행사 기록
+- 학생 자치 활동
+
+### FAQ
+- 자주 묻는 질문
+- 신입생 가이드
+
+---
+
+## 조직도
+
+총괄
+- 황태희
+
+부총괄
+- 최서영, 최서욱
+
+기획팀
+- 운영부
+- 콘텐츠부
+- 홍보부
+
+개발팀
+
+아트팀
+- 디자인부
+- 아트부
+
+---
+
+## 기술 스택
+
+- GitHub
+- GitHub Pages
+- HTML
+- CSS
+- JavaScript
+
+---
+
+## 지속 운영 방안
+
+- 프로젝트 전용 Gmail 사용
+- GitHub · Instagram · Google Form 통합 관리
+- 운영 매뉴얼 작성
+- 연간 운영진 모집
+- 인수인계 체계 구축
+
+---
+
+## 라이선스
+
+본 프로젝트는 안산동산고 학생 공동체를 위한 비영리 프로젝트입니다.
