@@ -1,0 +1,22 @@
+name: Wiki checks
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+        env:
+          # 비밀 키가 아닌 컴파일 검사 전용 값입니다. 실제 배포에 사용하지 않습니다.
+          VITE_SUPABASE_URL: https://build-check.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_build_check
