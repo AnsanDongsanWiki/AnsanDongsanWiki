@@ -40,14 +40,14 @@ function go(hash) { if (location.hash === hash) render(); else location.hash = h
 function shell() {
   const current = route().name;
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
-  <header class="topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><span class="brand-mark">${icon('leaf', 27)}</span><span>동산위키<small>DONGSAN WIKI</small></span></a>
+  <header class="topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.jpg" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
   <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
   <nav class="actions account-actions" aria-label="계정 메뉴">${session ? `<span class="muted">${e(profile?.nickname || '동산인')}</span>
   ${profile?.role === 'admin' ? '<a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div></main>
-  <footer><div class="wrap footer-top"><a class="brand" href="#home"><span class="brand-mark">${icon('leaf', 25)}</span><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
+  <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.jpg" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
   $('#logout')?.addEventListener('click', () => action(async () => {
     must(await client.auth.signOut()); session = null; profile = null; recovery = false; go('#home');
