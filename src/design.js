@@ -8,6 +8,8 @@ export function icon(name, size = 22) {
   club:'<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3m1-16a3 3 0 0 1 0 6m3 10v-3a6 6 0 0 0-3-5"/>',
   council:'<path d="M8 10V4h8v6M5 10h14v11H5zM9 14h6m-5 4h4M3 21h18"/>',
   faq:'<path d="M21 11a9 9 0 0 1-9 9H4l-2 2V11a9 9 0 0 1 19 0zM9 8a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3v.2"/>',
+  meal:'<path d="M4 2v6a3 3 0 0 0 6 0V2M7 2v20M20 22V2c-4 2-5 6-5 10h5"/>',
+  other:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   leaf:'<path d="M12 22V9m0 7C2 17 1 10 2 6c6-1 10 3 10 10zm0-5c0-7 4-10 10-10 1 6-3 11-10 10z"/>',
   pen:'<path d="m15 3 6 6M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-7 2 2-7z"/>',
@@ -21,6 +23,8 @@ export const categoryDetails = [
  ['동아리', 'club', '취향이 모여 만드는 이야기', '03'],
  ['학생회', 'council', '우리가 함께 만드는 학교', '04'],
  ['FAQ', 'faq', '먼저 궁금했던 질문들', '05'],
+ ['급식', 'meal', '오늘의 식단과 급식 안내', '06'],
+ ['기타', 'other', '함께 나누는 다양한 기록', '07'],
 ];
 export const previewPages = [
  ['first-steps', '학교생활, 어디서부터 알아볼까요?', '학교생활', '새로운 학교생활을 시작하는 동산인을 위한 안내서.'],
