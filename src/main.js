@@ -3,6 +3,7 @@ import { categories, escapeHtml as e, canEdit, safeUrl, validatePassword } from 
 import { icon, categoryDetails, previewPages } from './design.js';
 import '@fontsource-variable/noto-sans-kr';
 import './style.css';
+import { mountAttachmentEditor, renderAttachments, releaseAttachmentUrls } from './attachments.js';
 
 const app = document.querySelector('#app');
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -70,6 +71,7 @@ function sidebar(active) {
   <div class="side-note">${icon('pen', 21)}<p>아직 없는 이야기인가요?<br>여러분의 제안으로<br>위키가 조금씩 자랍니다.</p><a href="#about">기록에 참여하는 방법 →</a></div></aside>`;
 }
 async function render() {
+  releaseAttachmentUrls();
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
   shell();
@@ -194,8 +196,9 @@ async function pageView(content, id, token) {
   document.title = `${page.title} · 동산위키`;
   content.innerHTML = `<div class="section-head"><a href="#home">← 전체 문서</a><div class="actions">${!page.deleted_at && session ? `<a class="button" href="${canEdit(profile) ? '#edit?id=' : '#submit?target='}${page.id}">${canEdit(profile) ? '문서 수정' : '수정안 작성·제출'}</a>` : ''}${profile?.role === 'admin' && !page.deleted_at ? '<button id="delete-page">문서 삭제</button>' : ''}</div></div>
   ${page.deleted_at ? '<div class="notice">휴지통에 있는 문서입니다. 다른 회원과 방문자에게는 보이지 않습니다. <a href="#trash">휴지통에서 복구하기 →</a></div>' : ''}<article class="article"><span class="tag">${e(page.category)}</span><h1>${e(page.title)}</h1><p class="muted">${client ? date(page.updated_at) + ' · 버전 ' + page.version : '디자인 미리보기용 예시 문서'}</p>
-  <div class="body-text">${e(page.content)}</div><div class="source"><strong>출처</strong><br>${e(page.source || '출처가 등록되지 않았습니다.')}</div></article>
+  <div class="body-text">${e(page.content)}</div><div class="source"><strong>출처</strong><br>${e(page.source || '출처가 등록되지 않았습니다.')}</div><section id="page-files" class="attachments"></section></article>
   <section><h2>수정 이력 <span class="muted">최근 50개</span></h2>${!client ? '<p class="muted">예시 문서에는 실제 수정 이력이 없습니다.</p>' : ''}${revisions.map(r => `<div class="history-item"><button data-revision="${r.id}">버전 ${r.version} 보기</button> ${e(r.editor_name)} <span class="muted">${date(r.created_at)}</span><div id="revision-${r.id}"></div></div>`).join('')}</section>`;
+  renderAttachments(client, $('#page-files'), page.attachment_ids || []);
   $('#delete-page')?.addEventListener('click', () => {
     if (!window.confirm('이 문서를 휴지통으로 옮길까요? 공개 목록과 수정 이력에서 숨겨지고, 관리자가 복구할 수 있습니다.')) return;
     action(async () => {
@@ -204,10 +207,11 @@ async function pageView(content, id, token) {
     }, content);
   });
   document.querySelectorAll('[data-revision]').forEach(button => button.addEventListener('click', () => action(async () => {
-    const revision = must(await client.from('revisions').select('title,content,source').eq('id', button.dataset.revision).single());
+    const revision = must(await client.from('revisions').select('title,content,source,attachment_ids').eq('id', button.dataset.revision).single());
     if (token !== generation) return;
     const target = document.getElementById(`revision-${button.dataset.revision}`);
-    target.innerHTML = `<details open><summary>${e(revision.title)}</summary><pre>${e(revision.content)}</pre><p>출처: ${e(revision.source)}</p></details>`;
+    target.innerHTML = `<details open><summary>${e(revision.title)}</summary><pre>${e(revision.content)}</pre><p>출처: ${e(revision.source)}</p><div class="attachments" id="revision-files-${button.dataset.revision}"></div></details>`;
+    await renderAttachments(client, document.getElementById(`revision-files-${button.dataset.revision}`), revision.attachment_ids || []);
   })));
 }
 async function editView(content, id, token) {
@@ -221,12 +225,17 @@ async function editView(content, id, token) {
   <label>분류<select name="category">${categories.map(c => `<option ${c === page.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label>
   <label>본문<textarea name="content" required maxlength="50000">${e(page.content)}</textarea></label>
   <label>출처<input name="source" value="${e(page.source)}" required maxlength="2000" placeholder="자료명, 확인 날짜, 참고 URL 등"></label>
-  <button class="primary">문서와 수정 이력 저장</button></form>`;
+  <div id="edit-files"></div><button class="primary" disabled>문서와 수정 이력 저장</button></form>`;
+  const attachmentEditor = await mountAttachmentEditor(client, $('#edit-files'), page.attachment_ids || []);
+  if (token !== generation) return;
+  $('#edit-form > button').disabled = false;
   $('#edit-form').addEventListener('submit', event => {
     event.preventDefault(); const form = event.currentTarget, fields = new FormData(form);
     action(async () => {
-      const savedId = must(await client.rpc('save_page', { p_id: id || null, p_title: fields.get('title'), p_category: fields.get('category'), p_content: fields.get('content'), p_source: fields.get('source'), p_version: page.version || null }));
-      go(`#page?id=${savedId}`);
+      await attachmentEditor.save(async attachmentIds => {
+        const savedId = must(await client.rpc('save_page_with_attachments', { p_id: id || null, p_title: fields.get('title'), p_category: fields.get('category'), p_content: fields.get('content'), p_source: fields.get('source'), p_version: page.version || null, p_attachment_ids: attachmentIds }));
+        go(`#page?id=${savedId}`);
+      });
     }, form);
   });
 }
@@ -301,13 +310,18 @@ async function submissionEditView(content, id, token, targetId) {
     stale = !current || current.version !== row.base_version;
   }
   if (token !== generation) return;
-  content.innerHTML = `<div class="section-head"><h2>${isEdit ? '공개 문서 수정안' : id ? '제출 문서 수정' : '새 문서 작성·제출'}</h2><a href="#submissions">내 제출 문서</a></div><div class="notice">${isEdit ? `기준 버전 ${row.base_version}의 수정안입니다. 승인 전까지 기존 공개 내용은 유지됩니다.` : '관리자 승인 후 공개됩니다.'} 출처를 명시하고 타인의 개인정보를 적지 마세요. 제출 전 입력 내용은 자동 저장되지 않습니다.</div>${stale ? `<div class="notice">공개 문서가 변경되었거나 삭제되어 이 요청을 다시 제출할 수 없습니다. 내용을 복사해 두고 <a href="#page?id=${row.target_page_id}">현재 공개 문서</a>에서 새 수정안을 작성해 주세요.</div>` : ''}${row.review_note ? `<p class="body-text">관리자 의견: ${e(row.review_note)}</p>` : ''}<form id="submission-form" class="form"><label>문서 제목<input name="title" value="${e(row.title)}" required maxlength="120"></label><label>분류<select name="category">${categories.map(c => `<option ${c === row.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label>본문<textarea name="content" required maxlength="50000">${e(row.content)}</textarea></label><label>출처<input name="source" value="${e(row.source)}" required maxlength="2000" placeholder="자료명, 확인 날짜, 참고 URL 등"></label><button class="primary" ${stale ? 'disabled' : ''}>${id ? '수정 내용으로 다시 승인 요청' : '승인 요청하기'}</button></form>`;
+  content.innerHTML = `<div class="section-head"><h2>${isEdit ? '공개 문서 수정안' : id ? '제출 문서 수정' : '새 문서 작성·제출'}</h2><a href="#submissions">내 제출 문서</a></div><div class="notice">${isEdit ? `기준 버전 ${row.base_version}의 수정안입니다. 승인 전까지 기존 공개 내용은 유지됩니다.` : '관리자 승인 후 공개됩니다.'} 출처를 명시하고 타인의 개인정보를 적지 마세요. 제출 전 입력 내용은 자동 저장되지 않습니다.</div>${stale ? `<div class="notice">공개 문서가 변경되었거나 삭제되어 이 요청을 다시 제출할 수 없습니다. 내용을 복사해 두고 <a href="#page?id=${row.target_page_id}">현재 공개 문서</a>에서 새 수정안을 작성해 주세요.</div>` : ''}${row.review_note ? `<p class="body-text">관리자 의견: ${e(row.review_note)}</p>` : ''}<form id="submission-form" class="form"><label>문서 제목<input name="title" value="${e(row.title)}" required maxlength="120"></label><label>분류<select name="category">${categories.map(c => `<option ${c === row.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label>본문<textarea name="content" required maxlength="50000">${e(row.content)}</textarea></label><label>출처<input name="source" value="${e(row.source)}" required maxlength="2000" placeholder="자료명, 확인 날짜, 참고 URL 등"></label><div id="submission-files"></div><button class="primary" disabled>${id ? '수정 내용으로 다시 승인 요청' : '승인 요청하기'}</button></form>`;
+  const attachmentEditor = await mountAttachmentEditor(client, $('#submission-files'), row.attachment_ids || []);
+  if (token !== generation) return;
+  $('#submission-form > button').disabled = stale;
   $('#submission-form').addEventListener('submit', event => {
     event.preventDefault(); if (stale) return;
     const form = event.currentTarget, fields = new FormData(form);
     action(async () => {
-      must(await client.rpc('submit_wiki_document', { p_id: id || null, p_title: fields.get('title'), p_category: fields.get('category'), p_content: fields.get('content'), p_source: fields.get('source'), p_target_page_id: row.target_page_id || null, p_base_version: row.base_version || null }));
-      go('#submissions');
+      await attachmentEditor.save(async attachmentIds => {
+        must(await client.rpc('submit_wiki_document_with_attachments', { p_id: id || null, p_title: fields.get('title'), p_category: fields.get('category'), p_content: fields.get('content'), p_source: fields.get('source'), p_target_page_id: row.target_page_id || null, p_base_version: row.base_version || null, p_attachment_ids: attachmentIds }));
+        go('#submissions');
+      });
     }, form);
   });
 }
@@ -332,8 +346,10 @@ async function reviewView(content, id, token, params) {
   const isEdit = !!row.target_page_id;
   const stale = isEdit && (!current || current.deleted_at || current.version !== row.base_version);
   content.className = 'wrap reading-content';
-  const comparison = isEdit ? `<details class="article" open><summary>현재 ${current?.deleted_at ? '휴지통의' : '공개'} 내용 · 버전 ${current?.version ?? '없음'} / 요청 기준 버전 ${row.base_version}</summary>${current ? `<h2>${e(current.title)}</h2><span class="tag">${e(current.category)}</span><div class="body-text">${e(current.content)}</div><div class="source">출처: ${e(current.source)}</div>` : '<p>대상 문서를 찾을 수 없습니다.</p>'}</details>` : '';
-  content.innerHTML = `<a href="${e(backUrl)}">← 승인 대기 목록</a>${comparison}<article class="article"><span class="tag">${isEdit ? '제안된 수정안' : '새 문서'} · ${submissionStatuses[row.status]} · ${e(row.category)}</span><h1>${e(row.title)}</h1><p class="muted">제출자: ${e(row.author_name)} · ${date(row.updated_at)}</p><div class="body-text">${e(row.content)}</div><div class="source"><strong>출처</strong><br>${e(row.source)}</div></article>${row.status === 'pending' ? `<div class="notice">${stale ? '대상 문서가 변경되었거나 삭제되어 승인할 수 없습니다. 반려 후 현재 문서를 기준으로 다시 제출하도록 안내해 주세요.' : isEdit ? '승인하면 기존 문서에 수정안이 반영되고 이전 내용은 수정 이력에 남습니다.' : '승인하면 새 문서로 공개됩니다. 같은 제목의 문서가 있으면 승인이 중단됩니다.'}</div><form id="review-form" class="form"><label>심사 의견 (선택)<textarea name="note" maxlength="2000" style="min-height:100px" placeholder="반려 시 보완할 점을 안내해 주세요"></textarea></label><div class="actions"><button class="primary" type="submit" value="approve" ${stale ? 'disabled' : ''}>${isEdit ? '승인하고 수정 반영' : '승인하고 공개'}</button><button type="submit" value="reject">반려하기</button></div></form>` : `<p class="body-text">관리자 의견: ${e(row.review_note || '없음')}</p>`}`;
+  const comparison = isEdit ? `<details class="article" open><summary>현재 ${current?.deleted_at ? '휴지통의' : '공개'} 내용 · 버전 ${current?.version ?? '없음'} / 요청 기준 버전 ${row.base_version}</summary>${current ? `<h2>${e(current.title)}</h2><span class="tag">${e(current.category)}</span><div class="body-text">${e(current.content)}</div><div class="source">출처: ${e(current.source)}</div><div id="current-files" class="attachments"></div>` : '<p>대상 문서를 찾을 수 없습니다.</p>'}</details>` : '';
+  content.innerHTML = `<a href="${e(backUrl)}">← 승인 대기 목록</a>${comparison}<article class="article"><span class="tag">${isEdit ? '제안된 수정안' : '새 문서'} · ${submissionStatuses[row.status]} · ${e(row.category)}</span><h1>${e(row.title)}</h1><p class="muted">제출자: ${e(row.author_name)} · ${date(row.updated_at)}</p><div class="body-text">${e(row.content)}</div><div class="source"><strong>출처</strong><br>${e(row.source)}</div><div id="proposed-files" class="attachments"></div></article>${row.status === 'pending' ? `<div class="notice">${stale ? '대상 문서가 변경되었거나 삭제되어 승인할 수 없습니다. 반려 후 현재 문서를 기준으로 다시 제출하도록 안내해 주세요.' : isEdit ? '승인하면 기존 문서에 수정안이 반영되고 이전 내용은 수정 이력에 남습니다.' : '승인하면 새 문서로 공개됩니다. 같은 제목의 문서가 있으면 승인이 중단됩니다.'}</div><form id="review-form" class="form"><label>심사 의견 (선택)<textarea name="note" maxlength="2000" style="min-height:100px" placeholder="반려 시 보완할 점을 안내해 주세요"></textarea></label><div class="actions"><button class="primary" type="submit" value="approve" ${stale ? 'disabled' : ''}>${isEdit ? '승인하고 수정 반영' : '승인하고 공개'}</button><button type="submit" value="reject">반려하기</button></div></form>` : `<p class="body-text">관리자 의견: ${e(row.review_note || '없음')}</p>`}`;
+  renderAttachments(client, $('#current-files'), current?.attachment_ids || []);
+  renderAttachments(client, $('#proposed-files'), row.attachment_ids || []);
   $('#review-form')?.addEventListener('submit', event => {
     event.preventDefault(); const approve = event.submitter?.value === 'approve';
     if (approve && stale) return;
