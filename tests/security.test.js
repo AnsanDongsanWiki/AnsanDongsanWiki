@@ -23,7 +23,7 @@ before(async () => {
     $$;
     grant usage on schema auth,public to anon,authenticated;
     grant execute on function auth.uid() to anon,authenticated;`);
-  await db.exec(await readFile(new URL('../supabase/migrations/202611080001_wiki.sql', import.meta.url), 'utf8'));
+  await db.exec(await readFile(new URL('../supabass/migrations/202611080001_wiki.sql', import.meta.url), 'utf8'));
   await db.query('insert into auth.users(id,raw_user_meta_data) values ($1,$2),($3,$4),($5,$6)', [reader, {nickname:'일반회원',role:'admin'}, editor, {nickname:'편집자'}, admin, {nickname:'관리자'}]);
   await db.query("update public.profiles set role='editor' where id=$1", [editor]);
   await db.query("update public.profiles set role='admin' where id=$1", [admin]);
