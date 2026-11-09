@@ -10,6 +10,8 @@ export function icon(name, size = 22) {
   faq:'<path d="M21 11a9 9 0 0 1-9 9H4l-2 2V11a9 9 0 0 1 19 0zM9 8a3 3 0 0 1 6 0c0 2-3 2-3 4m0 3v.2"/>',
   meal:'<path d="M4 2v6a3 3 0 0 0 6 0V2M7 2v20M20 22V2c-4 2-5 6-5 10h5"/>',
   other:'<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  curriculum:'<path d="M4 3h13a3 3 0 0 1 3 3v15H6a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3M3 18a3 3 0 0 1 3-3h14M8 7h8m-8 4h6"/>',
+  admissions:'<path d="m2 8 10-5 10 5-10 5L2 8zm4 2v6c4 3 8 3 12 0v-6m4-2v9"/>',
   clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   leaf:'<path d="M12 22V9m0 7C2 17 1 10 2 6c6-1 10 3 10 10zm0-5c0-7 4-10 10-10 1 6-3 11-10 10z"/>',
   pen:'<path d="m15 3 6 6M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-7 2 2-7z"/>',
@@ -25,6 +27,8 @@ export const categoryDetails = [
  ['FAQ', 'faq', '먼저 궁금했던 질문들', '05'],
  ['급식', 'meal', '오늘의 식단과 급식 안내', '06'],
  ['기타', 'other', '함께 나누는 다양한 기록', '07'],
+ ['교육과정', 'curriculum', '과목 선택과 배움의 길잡이', '08'],
+ ['입결', 'admissions', '출처로 확인하는 대학 진학 결과', '09'],
 ];
 export const previewPages = [
  ['first-steps', '학교생활, 어디서부터 알아볼까요?', '학교생활', '새로운 학교생활을 시작하는 동산인을 위한 안내서.'],
