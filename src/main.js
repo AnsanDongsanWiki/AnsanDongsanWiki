@@ -40,10 +40,10 @@ function go(hash) { if (location.hash === hash) render(); else location.hash = h
 function shell() {
   const current = route().name;
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
-  <header class="topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.jpg" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
+  <header class="topbar${session ? ' member-topbar' : ''}"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.jpg" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
   <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
   <nav class="actions account-actions" aria-label="계정 메뉴">${session ? `<span class="muted">${e(profile?.nickname || '동산인')}</span>
-  ${profile?.role === 'admin' ? '<a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
+  <a class="button" href="#submissions">내 제출 문서</a>${profile?.role === 'admin' ? '<a class="button" href="#review">문서 승인</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div></main>
@@ -79,6 +79,9 @@ async function render() {
   try {
     if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') authView(name, content);
     else if (name === 'guide' || name === 'about') infoView(name, content);
+    else if (name === 'submissions') await submissionsView(content, token);
+    else if (name === 'submit') await submissionEditView(content, params.get('id'), token);
+    else if (name === 'review') await reviewView(content, params.get('id'), token);
     else if (name === 'admin') await adminView(content, token);
     else if (name === 'edit') await editView(content, params.get('id'), token);
     else if (name === 'page') await pageView(content, params.get('id'), token);
@@ -112,7 +115,7 @@ async function homeView(content, params, token) {
   <figure class="hero-art"><div class="art-label">FIELD NOTES <span>No. 001</span></div><img src="/archive-illustration.svg" alt="펼친 책 위에 학교와 나무가 솟아 있는 상상 일러스트" width="620" height="530"><figcaption>THE LITTLE THINGS THAT MAKE OUR SCHOOL.</figcaption></figure>
   <div class="hero-bottom"><span class="hero-bottom-label">우리 학교가 궁금할 때</span><form class="search" id="search">${icon('search', 23)}<input name="q" aria-label="문서 제목 검색" maxlength="120" placeholder="궁금한 동산의 이야기를 검색해 보세요" value="${e(query)}"><kbd aria-hidden="true">Enter ↵</kbd><button class="primary" aria-label="검색">${icon('arrow', 23)}</button></form><div class="quick-search"><span>빠르게 찾기</span><button data-query="기숙사">기숙사</button><button data-query="동아리">동아리</button><button data-query="신입생">신입생 안내</button></div></div></section>
   <section class="category-section" aria-label="주제별 바로가기"><div class="category-heading"><span class="eyebrow">FIND YOUR CHAPTER</span><h2>어떤 이야기를 찾고 있나요?</h2></div><div class="category-grid">${categoryDetails.map(([cat, symbol, description, number]) => `<button class="category-tile ${cat === category ? 'selected' : ''}" data-category="${cat}"><span class="tile-top">${icon(symbol, 27)}<span>${number}</span></span><strong>${cat}</strong><span class="tile-desc">${description}</span><span class="tile-arrow">↗</span></button>`).join('')}</div></section>
-  <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${canEdit(profile) ? '<a class="button primary" href="#edit">문서 작성 +</a>' : filtering ? '<a class="text-link" href="#home">전체 문서 보기 ↗</a>' : '<span class="muted">'+ (client ? '최근 수정 순' : '미리보기용 예시') +'</span>'}</div>
+  <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${session ? `<a class="button primary" href="${canEdit(profile) ? '#edit' : '#submit'}">${canEdit(profile) ? '문서 작성 +' : '문서 작성·제출 +'}</a>` : filtering ? '<a class="text-link" href="#home">전체 문서 보기 ↗</a>' : '<span class="muted">'+ (client ? '최근 수정 순' : '미리보기용 예시') +'</span>'}</div>
   ${pages.length ? `<div class="document-list">${pages.map((p, index) => `<a class="document-row" href="#page?id=${encodeURIComponent(p.id)}"><span class="doc-index">${String(page * 24 + index + 1).padStart(2, '0')}</span><div class="doc-info"><span class="doc-category">${e(p.category)}</span><h3>${e(p.title)}</h3>${p.description ? `<p>${e(p.description)}</p>` : ''}</div><span class="doc-date">${client ? date(p.updated_at) : '예시 문서'}</span><span class="doc-arrow">↗</span></a>`).join('')}</div>` : `<div class="empty">${icon('book', 34)}<h3>${filtering ? '아직 이 이야기를 찾지 못했어요.' : '첫 번째 기록을 기다리고 있어요.'}</h3><p>${filtering ? '다른 검색어나 분류로 찾아보세요.' : '운영진이 확인한 이야기부터 차근차근 채워갈 예정입니다.'}</p><a class="text-link" href="#home">전체 문서로 돌아가기 →</a></div>`}
   ${count > 24 ? `<div class="pagination"><button id="prev" ${page === 0 ? 'disabled' : ''}>← 이전</button><span>${page + 1}</span><button id="next" ${(page + 1) * 24 >= count ? 'disabled' : ''}>다음 →</button></div>` : ''}</section></div>
   <section class="guide-banner"><div class="guide-book" aria-hidden="true"><span>DONGSAN<br>FIELD<br>GUIDE</span><b>${icon('leaf', 35)}</b><small>FOR YOUR FIRST CHAPTER</small></div><div class="guide-copy"><span class="eyebrow">A LITTLE HELP FOR A NEW BEGINNING</span><h2>처음의 동산이,<br>조금 더 익숙해지도록.</h2><p>새로운 시작에 필요한 이야기들을 차근차근 모았습니다.<br>어디서 시작할지 모르겠다면, 이곳부터 펼쳐 보세요.</p><a class="button light" href="#guide">신입생을 위한 첫 안내서 ${icon('arrow', 18)}</a></div><span class="banner-number" aria-hidden="true">01</span></section>
@@ -129,7 +132,7 @@ function infoView(name, content) {
   const guide = name === 'guide';
   content.className = 'wrap reading-content';
   content.innerHTML = `<a class="back-link" href="#home">← 위키로 돌아가기</a><article class="article info-article"><span class="eyebrow">${guide ? 'YOUR FIRST CHAPTER' : 'ABOUT THIS ARCHIVE'}</span><h1>${guide ? '처음의 동산을 위한<br>작은 길잡이.' : '우리의 오늘을,<br>다음 동산인에게.'}</h1><p class="article-intro">${guide ? '모든 것을 한 번에 알 필요는 없어요.<br>궁금한 이야기부터 하나씩 펼쳐 보세요.' : '학생이 기록하고, 공유하며, 이어가는 학교 정보 플랫폼.<br>안산동산고 디지털 위키를 소개합니다.'}</p>
-  ${guide ? `<div class="info-steps">${categoryDetails.map(([cat, symbol, description, number]) => `<a href="#home?category=${encodeURIComponent(cat)}"><span>${number}</span>${icon(symbol, 26)}<div><h2>${cat}</h2><p>${description}</p></div><b>↗</b></a>`).join('')}</div><div class="notice">실제 학교생활에 관한 최종 안내는 학교의 공식 공지와 규정을 확인해 주세요. 위키는 학생들이 만드는 보조 안내서입니다.</div>` : `<div class="about-body"><h2>함께 만드는 학교의 기록실</h2><p>학교생활 정보, 동아리 소개, 학생 자치 활동, 신입생 가이드와 자주 묻는 질문을 모읍니다. 공식 홈페이지를 대체하기보다 학생들이 궁금해하는 정보를 찾기 쉽게 정리합니다.</p><h2>누구나 제안하고, 운영진이 확인합니다.</h2><p>새로운 정보와 수정 요청을 운영진에게 제안하면, 사실과 출처를 검토한 뒤 승인된 편집자가 문서에 반영합니다. 회원가입만으로 편집 권한이 생기지는 않습니다.</p><h2>우리의 기록이 지키는 세 가지</h2><div class="principles"><div><strong>01 사실</strong><p>확인 가능한 정보를 씁니다.</p></div><div><strong>02 출처</strong><p>정보가 온 곳을 남깁니다.</p></div><div><strong>03 존중</strong><p>타인의 개인정보를 보호합니다.</p></div></div>${suggestion ? `<a class="button primary" href="${e(suggestion)}" target="_blank" rel="noopener noreferrer">수정 제안하기 ↗</a>` : '<p class="muted">제안 접수 경로는 운영진이 연결하면 이곳에 표시됩니다.</p>'}<a class="text-link" href="#signup">동산위키에 함께하기 →</a></div>`}</article>`;
+  ${guide ? `<div class="info-steps">${categoryDetails.map(([cat, symbol, description, number]) => `<a href="#home?category=${encodeURIComponent(cat)}"><span>${number}</span>${icon(symbol, 26)}<div><h2>${cat}</h2><p>${description}</p></div><b>↗</b></a>`).join('')}</div><div class="notice">실제 학교생활에 관한 최종 안내는 학교의 공식 공지와 규정을 확인해 주세요. 위키는 학생들이 만드는 보조 안내서입니다.</div>` : `<div class="about-body"><h2>함께 만드는 학교의 기록실</h2><p>학교생활 정보, 동아리 소개, 학생 자치 활동, 신입생 가이드와 자주 묻는 질문을 모읍니다. 공식 홈페이지를 대체하기보다 학생들이 궁금해하는 정보를 찾기 쉽게 정리합니다.</p><h2>누구나 제안하고, 운영진이 확인합니다.</h2><p>일반 회원도 새 문서를 작성해 제출할 수 있습니다. 승인 전에는 작성자 본인과 관리자만 볼 수 있으며, 관리자가 승인하면 공개됩니다. 편집자와 관리자는 문서를 직접 게시·수정할 수 있습니다.</p><h2>우리의 기록이 지키는 세 가지</h2><div class="principles"><div><strong>01 사실</strong><p>확인 가능한 정보를 씁니다.</p></div><div><strong>02 출처</strong><p>정보가 온 곳을 남깁니다.</p></div><div><strong>03 존중</strong><p>타인의 개인정보를 보호합니다.</p></div></div>${suggestion ? `<a class="button primary" href="${e(suggestion)}" target="_blank" rel="noopener noreferrer">수정 제안하기 ↗</a>` : '<p class="muted">제안 접수 경로는 운영진이 연결하면 이곳에 표시됩니다.</p>'}<a class="text-link" href="#signup">동산위키에 함께하기 →</a></div>`}</article>`;
 }
 function authView(mode, content) {
   const reset = mode === 'reset', signup = mode === 'signup', forgot = mode === 'forgot';
@@ -148,7 +151,7 @@ function authView(mode, content) {
   ${signup ? '<label><span><input type="checkbox" name="ack" required> 닉네임이 수정 이력에 공개되며, 개인정보를 문서에 게시할 수 없음을 확인했습니다.</span></label>' : ''}
   <button class="primary">${reset ? '비밀번호 변경' : signup ? '가입하기' : forgot ? '재설정 이메일 받기' : '로그인'}</button></form>
   ${!client ? '<p class="preview-auth">디자인 미리보기입니다. 실제 계정 등록·인증은 연결 후 가능합니다.</p>' : ''}
-  <p class="muted">${signup ? '가입 후 인증 이메일의 링크를 눌러 주세요. 편집 권한은 관리자가 별도로 부여합니다.' : ''}</p>
+  <p class="muted">${signup ? '가입 후 인증 이메일의 링크를 눌러 주세요. 일반 회원의 제출 문서는 관리자 승인 후 공개됩니다.' : ''}</p>
   ${!reset ? '<div class="actions"><a href="#forgot">비밀번호 찾기</a><a href="#home">위키 둘러보기</a></div>' : ''}</section>`;
   if (!client) $('#auth-form button.primary').disabled = true;
   $('#auth-form').addEventListener('submit', event => {
@@ -200,7 +203,7 @@ async function pageView(content, id, token) {
   })));
 }
 async function editView(content, id, token) {
-  if (!canEdit(profile)) { content.innerHTML = '<div class="notice">승인된 운영진만 문서를 작성·수정할 수 있습니다.</div><a href="#login">로그인하기</a>'; return; }
+  if (!canEdit(profile)) { content.innerHTML = '<div class="notice">일반 회원은 새 문서를 작성해 승인 요청할 수 있습니다. 공개 문서의 직접 수정은 편집자부터 가능합니다.</div><a class="button primary" href="#submit">새 문서 작성·제출</a>'; return; }
   const page = id ? must(await client.from('pages').select('*').eq('id', id).single()) : { title: '', content: '', source: '', category: categories[0] };
   if (token !== generation) return;
   content.innerHTML = `<div class="section-head"><h2>${id ? '문서 수정' : '새 문서 작성'}</h2><a href="${id ? `#page?id=${id}` : '#home'}">취소</a></div>
@@ -231,6 +234,54 @@ async function adminView(content, token) {
     notify('편집 권한을 변경했습니다.');
   })));
 }
+const submissionStatuses = { pending: '승인 대기', approved: '승인·공개', rejected: '반려' };
+function requireMember(content) {
+  if (session && profile) return true;
+  content.innerHTML = '<div class="notice">로그인 후 문서를 작성·제출할 수 있습니다.</div><a class="button primary" href="#login">로그인하기</a>';
+  return false;
+}
+async function submissionsView(content, token) {
+  if (!requireMember(content)) return;
+  const rows = must(await client.from('document_submissions').select('id,title,category,status,review_note,published_page_id,updated_at').eq('author_id', session.user.id).order('updated_at', { ascending: false }).limit(200));
+  if (token !== generation) return;
+  content.innerHTML = `<div class="section-head"><h2>내 제출 문서</h2><a class="button primary" href="#submit">새 문서 작성·제출</a></div><p class="muted">최근 200개 · 승인 전에는 본인과 관리자만 볼 수 있습니다. 편집 내용은 제출 버튼을 눌러야 저장됩니다.</p>${rows.length ? rows.map(row => `<article class="article"><span class="tag">${submissionStatuses[row.status]}</span><h2>${e(row.title)}</h2><p class="muted">${e(row.category)} · ${date(row.updated_at)}</p>${row.review_note ? `<p class="body-text">관리자 의견: ${e(row.review_note)}</p>` : ''}${row.status === 'approved' ? (row.published_page_id ? `<a class="button" href="#page?id=${row.published_page_id}">공개 문서 보기</a>` : '<p>공개 문서를 찾을 수 없습니다.</p>') : `<a class="button" href="#submit?id=${row.id}">${row.status === 'rejected' ? '수정 후 다시 제출' : '제출 내용 확인·수정'}</a>`}</article>`).join('') : '<div class="empty">아직 제출한 문서가 없습니다.</div>'}`;
+}
+async function submissionEditView(content, id, token) {
+  if (!requireMember(content)) return;
+  const row = id ? must(await client.from('document_submissions').select('*').eq('id', id).eq('author_id', session.user.id).single()) : { title: '', category: categories[0], content: '', source: '' };
+  if (token !== generation) return;
+  if (row.status === 'approved') { content.innerHTML = '<div class="notice">이미 승인된 문서입니다.</div><a href="#submissions">내 제출 문서로 돌아가기</a>'; return; }
+  content.innerHTML = `<div class="section-head"><h2>${id ? '제출 문서 수정' : '새 문서 작성·제출'}</h2><a href="#submissions">내 제출 문서</a></div><div class="notice">관리자 승인 후 공개됩니다. 출처를 명시하고 타인의 실명·연락처 등 개인정보를 적지 마세요. 제출 전 입력 내용은 자동 저장되지 않습니다.</div>${row.review_note ? `<p class="body-text">관리자 의견: ${e(row.review_note)}</p>` : ''}<form id="submission-form" class="form"><label>문서 제목<input name="title" value="${e(row.title)}" required maxlength="120"></label><label>분류<select name="category">${categories.map(c => `<option ${c === row.category ? 'selected' : ''}>${c}</option>`).join('')}</select></label><label>본문<textarea name="content" required maxlength="50000">${e(row.content)}</textarea></label><label>출처<input name="source" value="${e(row.source)}" required maxlength="2000" placeholder="자료명, 확인 날짜, 참고 URL 등"></label><button class="primary">${id ? '수정 내용으로 다시 승인 요청' : '승인 요청하기'}</button></form>`;
+  $('#submission-form').addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget, fields = new FormData(form);
+    action(async () => {
+      must(await client.rpc('submit_wiki_document', { p_id: id || null, p_title: fields.get('title'), p_category: fields.get('category'), p_content: fields.get('content'), p_source: fields.get('source') }));
+      go('#submissions');
+    }, form);
+  });
+}
+async function reviewView(content, id, token) {
+  if (profile?.role !== 'admin') { content.innerHTML = '<div class="notice">관리자만 심사할 수 있습니다.</div>'; return; }
+  if (!id) {
+    const rows = must(await client.from('document_submissions').select('id,title,category,author_name,updated_at').eq('status', 'pending').order('created_at').limit(200));
+    if (token !== generation) return;
+    content.innerHTML = `<h2>문서 승인</h2><p class="muted">승인 대기 중인 문서 · 오래된 요청부터 최대 200개</p>${rows.length ? rows.map(row => `<article class="article"><span class="tag">${e(row.category)}</span><h2>${e(row.title)}</h2><p>${e(row.author_name)} · ${date(row.updated_at)}</p><a class="button primary" href="#review?id=${row.id}">내용 확인·심사</a></article>`).join('') : '<div class="empty">승인 대기 문서가 없습니다.</div>'}`;
+    return;
+  }
+  const row = must(await client.from('document_submissions').select('*').eq('id', id).single());
+  if (token !== generation) return;
+  content.className = 'wrap reading-content';
+  content.innerHTML = `<a href="#review">← 승인 대기 목록</a><article class="article"><span class="tag">${submissionStatuses[row.status]} · ${e(row.category)}</span><h1>${e(row.title)}</h1><p class="muted">제출자: ${e(row.author_name)} · ${date(row.updated_at)}</p><div class="body-text">${e(row.content)}</div><div class="source"><strong>출처</strong><br>${e(row.source)}</div></article>${row.status === 'pending' ? '<div class="notice">승인하면 이 내용이 새 문서로 공개됩니다. 같은 제목의 공개 문서가 있으면 승인이 중단됩니다.</div><form id="review-form" class="form"><label>심사 의견 (선택)<textarea name="note" maxlength="2000" style="min-height:100px" placeholder="반려 시 보완할 점을 안내해 주세요"></textarea></label><div class="actions"><button class="primary" type="submit" value="approve">승인하고 공개</button><button type="submit" value="reject">반려하기</button></div></form>' : `<p class="body-text">관리자 의견: ${e(row.review_note || '없음')}</p>`}`;
+  $('#review-form')?.addEventListener('submit', event => {
+    event.preventDefault(); const approve = event.submitter?.value === 'approve';
+    const form = event.currentTarget, fields = new FormData(form);
+    action(async () => {
+      must(await client.rpc('review_wiki_document', { p_id: row.id, p_approve: approve, p_note: fields.get('note'), p_expected_updated_at: row.updated_at }));
+      go('#review');
+    }, form);
+  });
+}
+
 window.addEventListener('hashchange', render);
 async function boot() {
   if (!client) return render();
