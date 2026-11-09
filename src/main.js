@@ -82,8 +82,8 @@ async function render() {
     else if (name === 'submissions') await submissionsView(content, token);
     else if (name === 'submit') await submissionEditView(content, params.get('id'), token, params.get('target'));
     else if (name === 'trash') await trashView(content, token);
-    else if (name === 'review') await reviewView(content, params.get('id'), token);
-    else if (name === 'admin') await adminView(content, token);
+    else if (name === 'review') await reviewView(content, params.get('id'), token, params);
+    else if (name === 'admin') await adminView(content, token, params);
     else if (name === 'edit') await editView(content, params.get('id'), token);
     else if (name === 'page') await pageView(content, params.get('id'), token);
     else await homeView(content, params, token);
@@ -230,12 +230,41 @@ async function editView(content, id, token) {
     }, form);
   });
 }
-async function adminView(content, token) {
+function managementUrl(scope, query = '', page = 0, id = '') {
+  const params = new URLSearchParams({ q: query, p: String(page) });
+  if (id) params.set('id', id);
+  return `#${scope}?${params}`;
+}
+function managementSearchState(params) {
+  return { query: (params.get('q') || '').trim().slice(0, 120), page: Math.max(0, Math.min(10000, Number.parseInt(params.get('p'), 10) || 0)) };
+}
+function managementSearchForm(query, label) {
+  return `<form id="management-search" class="search" style="max-width:650px;margin:20px 0">${icon('search', 21)}<input name="q" aria-label="${label}" placeholder="${label}" value="${e(query)}" maxlength="120"><button class="primary" type="submit">검색</button>${query ? '<button id="management-clear" type="button">초기화</button>' : ''}</form>`;
+}
+function managementPagination(page, count, size) {
+  return count > size ? `<div class="pagination"><button id="management-prev" ${page === 0 ? 'disabled' : ''}>← 이전</button><span>${page + 1} / ${Math.ceil(count / size)}</span><button id="management-next" ${(page + 1) * size >= count ? 'disabled' : ''}>다음 →</button></div>` : '';
+}
+function bindManagementSearch(scope, query, page) {
+  $('#management-search').addEventListener('submit', event => {
+    event.preventDefault();
+    go(managementUrl(scope, String(new FormData(event.currentTarget).get('q') || '').trim().slice(0, 120)));
+  });
+  $('#management-clear')?.addEventListener('click', () => go(managementUrl(scope)));
+  $('#management-prev')?.addEventListener('click', () => go(managementUrl(scope, query, page - 1)));
+  $('#management-next')?.addEventListener('click', () => go(managementUrl(scope, query, page + 1)));
+}
+async function adminView(content, token, params) {
   if (profile?.role !== 'admin') { content.innerHTML = '<div class="notice">관리자만 접근할 수 있습니다.</div>'; return; }
-  const members = must(await client.from('profiles').select('id,nickname,role,created_at').order('created_at', { ascending: false }).limit(500));
+  const { query, page } = managementSearchState(params), size = 50;
+  let request = client.from('profiles').select('id,nickname,role,created_at', { count: 'exact' }).order('created_at', { ascending: false }).order('id');
+  if (query) request = request.ilike('nickname', `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`);
+  const result = await request.range(page * size, page * size + size - 1);
+  const members = must(result), count = result.count || 0;
   if (token !== generation) return;
-  content.innerHTML = `<h2>편집 권한 관리</h2><p class="muted">최근 가입 계정 500개 · 닉네임과 가입 시점을 확인한 뒤 운영진에게만 편집 권한을 부여하세요. 관리자 지정은 Supabase에서 진행합니다.</p>
-  ${members.map(member => `<div class="member"><div><strong>${e(member.nickname)}</strong><br><span class="muted">${date(member.created_at)} · ${e(member.id)}</span></div>${member.role === 'admin' ? '<span class="tag">관리자</span>' : `<div class="actions"><select aria-label="${e(member.nickname)} 권한" id="role-${member.id}"><option value="reader" ${member.role === 'reader' ? 'selected' : ''}>일반 회원</option><option value="editor" ${member.role === 'editor' ? 'selected' : ''}>편집자</option></select><button data-member="${member.id}">적용</button></div>`}</div>`).join('')}`;
+  if (page > 0 && page * size >= count) { go(managementUrl('admin', query, Math.max(0, Math.ceil(count / size) - 1))); return; }
+  content.innerHTML = `<h2>편집 권한 관리</h2><p class="muted">닉네임으로 모든 회원을 검색할 수 있습니다. 가입 시점을 함께 확인한 뒤 운영진에게만 편집 권한을 부여하세요. 관리자 지정은 Supabase에서 진행합니다.</p>${managementSearchForm(query, '회원 닉네임 검색')}<p class="muted">${query ? `‘${e(query)}’ 검색 결과` : '전체 회원'} ${count}명</p>
+  ${members.length ? members.map(member => `<div class="member"><div><strong>${e(member.nickname)}</strong><br><span class="muted">${date(member.created_at)} · ${e(member.id)}</span></div>${member.role === 'admin' ? '<span class="tag">관리자</span>' : `<div class="actions"><select aria-label="${e(member.nickname)} 권한" id="role-${member.id}"><option value="reader" ${member.role === 'reader' ? 'selected' : ''}>일반 회원</option><option value="editor" ${member.role === 'editor' ? 'selected' : ''}>편집자</option></select><button data-member="${member.id}">적용</button></div>`}</div>`).join('') : '<div class="empty">검색 결과가 없습니다. 다른 닉네임으로 찾아보세요.</div>'}${managementPagination(page, count, size)}`;
+  bindManagementSearch('admin', query, page);
   document.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', () => action(async () => {
     const id = button.dataset.member;
     const rows = must(await client.from('profiles').update({ role: document.getElementById(`role-${id}`).value }).eq('id', id).select('id'));
@@ -282,12 +311,19 @@ async function submissionEditView(content, id, token, targetId) {
     }, form);
   });
 }
-async function reviewView(content, id, token) {
+async function reviewView(content, id, token, params) {
   if (profile?.role !== 'admin') { content.innerHTML = '<div class="notice">관리자만 심사할 수 있습니다.</div>'; return; }
+  const { query, page } = managementSearchState(params), size = 24;
+  const backUrl = managementUrl('review', query, page);
   if (!id) {
-    const rows = must(await client.from('document_submissions').select('id,title,category,author_name,updated_at,target_page_id').eq('status', 'pending').order('created_at').limit(200));
+    let request = client.from('document_submissions').select('id,title,category,author_name,updated_at,target_page_id', { count: 'exact' }).eq('status', 'pending').order('created_at').order('id');
+    if (query) request = request.ilike('title', `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`);
+    const result = await request.range(page * size, page * size + size - 1);
+    const rows = must(result), count = result.count || 0;
     if (token !== generation) return;
-    content.innerHTML = `<h2>문서 승인</h2><p class="muted">새 문서·수정안 승인 대기 · 오래된 요청부터 최대 200개</p>${rows.length ? rows.map(row => `<article class="article"><span class="tag">${row.target_page_id ? '수정안' : '새 문서'} · ${e(row.category)}</span><h2>${e(row.title)}</h2><p>${e(row.author_name)} · ${date(row.updated_at)}</p><a class="button primary" href="#review?id=${row.id}">내용 확인·심사</a></article>`).join('') : '<div class="empty">승인 대기 문서가 없습니다.</div>'}`;
+    if (page > 0 && page * size >= count) { go(managementUrl('review', query, Math.max(0, Math.ceil(count / size) - 1))); return; }
+    content.innerHTML = `<h2>문서 승인</h2><p class="muted">승인 대기 중인 새 문서·수정안을 제목으로 검색합니다. 오래된 요청부터 표시됩니다.</p>${managementSearchForm(query, '승인 요청 문서 제목 검색')}<p class="muted">${query ? `‘${e(query)}’ 검색 결과` : '전체 승인 대기'} ${count}건</p>${rows.length ? rows.map(row => `<article class="article"><span class="tag">${row.target_page_id ? '수정안' : '새 문서'} · ${e(row.category)}</span><h2>${e(row.title)}</h2><p>${e(row.author_name)} · ${date(row.updated_at)}</p><a class="button primary" href="${e(managementUrl('review', query, page, row.id))}">내용 확인·심사</a></article>`).join('') : `<div class="empty">${query ? '검색 결과가 없습니다. 다른 제목으로 찾아보세요.' : '승인 대기 문서가 없습니다.'}</div>`}${managementPagination(page, count, size)}`;
+    bindManagementSearch('review', query, page);
     return;
   }
   const row = must(await client.from('document_submissions').select('*').eq('id', id).single());
@@ -297,14 +333,14 @@ async function reviewView(content, id, token) {
   const stale = isEdit && (!current || current.deleted_at || current.version !== row.base_version);
   content.className = 'wrap reading-content';
   const comparison = isEdit ? `<details class="article" open><summary>현재 ${current?.deleted_at ? '휴지통의' : '공개'} 내용 · 버전 ${current?.version ?? '없음'} / 요청 기준 버전 ${row.base_version}</summary>${current ? `<h2>${e(current.title)}</h2><span class="tag">${e(current.category)}</span><div class="body-text">${e(current.content)}</div><div class="source">출처: ${e(current.source)}</div>` : '<p>대상 문서를 찾을 수 없습니다.</p>'}</details>` : '';
-  content.innerHTML = `<a href="#review">← 승인 대기 목록</a>${comparison}<article class="article"><span class="tag">${isEdit ? '제안된 수정안' : '새 문서'} · ${submissionStatuses[row.status]} · ${e(row.category)}</span><h1>${e(row.title)}</h1><p class="muted">제출자: ${e(row.author_name)} · ${date(row.updated_at)}</p><div class="body-text">${e(row.content)}</div><div class="source"><strong>출처</strong><br>${e(row.source)}</div></article>${row.status === 'pending' ? `<div class="notice">${stale ? '대상 문서가 변경되었거나 삭제되어 승인할 수 없습니다. 반려 후 현재 문서를 기준으로 다시 제출하도록 안내해 주세요.' : isEdit ? '승인하면 기존 문서에 수정안이 반영되고 이전 내용은 수정 이력에 남습니다.' : '승인하면 새 문서로 공개됩니다. 같은 제목의 문서가 있으면 승인이 중단됩니다.'}</div><form id="review-form" class="form"><label>심사 의견 (선택)<textarea name="note" maxlength="2000" style="min-height:100px" placeholder="반려 시 보완할 점을 안내해 주세요"></textarea></label><div class="actions"><button class="primary" type="submit" value="approve" ${stale ? 'disabled' : ''}>${isEdit ? '승인하고 수정 반영' : '승인하고 공개'}</button><button type="submit" value="reject">반려하기</button></div></form>` : `<p class="body-text">관리자 의견: ${e(row.review_note || '없음')}</p>`}`;
+  content.innerHTML = `<a href="${e(backUrl)}">← 승인 대기 목록</a>${comparison}<article class="article"><span class="tag">${isEdit ? '제안된 수정안' : '새 문서'} · ${submissionStatuses[row.status]} · ${e(row.category)}</span><h1>${e(row.title)}</h1><p class="muted">제출자: ${e(row.author_name)} · ${date(row.updated_at)}</p><div class="body-text">${e(row.content)}</div><div class="source"><strong>출처</strong><br>${e(row.source)}</div></article>${row.status === 'pending' ? `<div class="notice">${stale ? '대상 문서가 변경되었거나 삭제되어 승인할 수 없습니다. 반려 후 현재 문서를 기준으로 다시 제출하도록 안내해 주세요.' : isEdit ? '승인하면 기존 문서에 수정안이 반영되고 이전 내용은 수정 이력에 남습니다.' : '승인하면 새 문서로 공개됩니다. 같은 제목의 문서가 있으면 승인이 중단됩니다.'}</div><form id="review-form" class="form"><label>심사 의견 (선택)<textarea name="note" maxlength="2000" style="min-height:100px" placeholder="반려 시 보완할 점을 안내해 주세요"></textarea></label><div class="actions"><button class="primary" type="submit" value="approve" ${stale ? 'disabled' : ''}>${isEdit ? '승인하고 수정 반영' : '승인하고 공개'}</button><button type="submit" value="reject">반려하기</button></div></form>` : `<p class="body-text">관리자 의견: ${e(row.review_note || '없음')}</p>`}`;
   $('#review-form')?.addEventListener('submit', event => {
     event.preventDefault(); const approve = event.submitter?.value === 'approve';
     if (approve && stale) return;
     const form = event.currentTarget, fields = new FormData(form);
     action(async () => {
       must(await client.rpc('review_wiki_document', { p_id: row.id, p_approve: approve, p_note: fields.get('note'), p_expected_updated_at: row.updated_at }));
-      go('#review');
+      go(backUrl);
     }, form);
   });
 }
