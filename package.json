@@ -1,0 +1,35 @@
+{
+  "name": "ansandongsanwiki",
+  "version": "1.0.0",
+  "description": "학생이 기록하고, 공유하며, 이어가는 학교 정보 플랫폼",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "node --test tests/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AnsanDongsanWiki/AnsanDongsanWiki.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/AnsanDongsanWiki/AnsanDongsanWiki/issues"
+  },
+  "homepage": "https://github.com/AnsanDongsanWiki/AnsanDongsanWiki#readme",
+  "dependencies": {
+    "@fontsource-variable/noto-sans-kr": "^5.3.1",
+    "@supabase/supabase-js": "^2.119.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15",
+    "vite": "^8.3.6"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
