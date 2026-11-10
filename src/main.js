@@ -1,3 +1,4 @@
+import { qnaView } from './qna.js';
 import { createClient } from '@supabase/supabase-js';
 import { categories, escapeHtml as e, canEdit, safeUrl, validatePassword, linkifyText } from './core.js';
 import { icon, categoryDetails, previewPages } from './design.js';
@@ -44,9 +45,9 @@ function shell() {
   const ranked = ['home', 'page', 'edit', 'submit'].includes(current);
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
   <header class="topbar${session ? ' member-topbar' : ''}"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
-  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
+  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
   <nav class="actions account-actions" aria-label="계정 메뉴">${session ? `<span class="muted">${e(profile?.nickname || '동산인')}</span>
-  <a class="button" href="#submissions">내 제출 문서</a><a class="button" href="#contact">관리자에게 문의</a>${profile?.role === 'admin' ? '<a class="button" href="#inquiries">문의 관리</a><a class="button" href="#review">문서 승인</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
+  <a class="button" href="#submissions">내 제출 문서</a><a class="button" href="#contact">관리자에게 문의</a>${profile?.role === 'admin' ? '<a class="button" href="#qna-review">Q&amp;A 승인</a><a class="button" href="#inquiries">문의 관리</a><a class="button" href="#review">문서 승인</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="많이 본 문서"><div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">같은 브라우저는 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
@@ -84,6 +85,7 @@ async function render() {
   try {
     if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') authView(name, content);
     else if (name === 'guide' || name === 'about') infoView(name, content);
+    else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (name === 'contact') await contactView(content, token, params);
     else if (name === 'inquiries') await inquiriesView(content, token, params);
     else if (name === 'inquiry') await inquiryView(content, token, params);
