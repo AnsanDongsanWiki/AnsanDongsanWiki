@@ -1,3 +1,4 @@
+import { profileView } from './profile.js';
 import { qnaView } from './qna.js';
 import { createClient } from '@supabase/supabase-js';
 import { categories, escapeHtml as e, canEdit, safeUrl, validatePassword, linkifyText } from './core.js';
@@ -44,18 +45,16 @@ function shell() {
   const current = route().name;
   const ranked = ['home', 'page', 'edit', 'submit'].includes(current);
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
-  <header class="topbar${session ? ' member-topbar' : ''}"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
-  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
-  <nav class="actions account-actions" aria-label="계정 메뉴">${session ? `<span class="muted">${e(profile?.nickname || '동산인')}</span>
-  <a class="button" href="#submissions">내 제출 문서</a><a class="button" href="#contact">관리자에게 문의</a>${canEdit(profile) ? '<a class="button" href="#review">문서 승인</a><a class="button" href="#qna-review">Q&amp;A 승인</a>' : ''}${profile?.role === 'admin' ? '<a class="button" href="#inquiries">문의 관리</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
+  <header class="topbar profile-topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
+  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
+  ${!session ? '<nav class="actions account-actions" aria-label="계정 메뉴"><a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a></nav>' : ''}</div></header>
+  <a class="contact-float" href="#contact" aria-label="관리자에게 문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H7l-5 3 1.5-6A8 8 0 0 1 3 11a9 9 0 0 1 18 0Z"/><path d="M7 10h10M7 14h6"/></svg><span>문의하기</span></a>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="많이 본 문서"><div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">같은 브라우저는 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
   <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
-  $('#logout')?.addEventListener('click', () => action(async () => {
-    must(await client.auth.signOut()); session = null; profile = null; recovery = false; go('#home');
-  }));
+
 }
 async function action(fn, form) {
   if (busy) return;
@@ -84,6 +83,7 @@ async function render() {
   const { name, params } = route();
   try {
     if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') authView(name, content);
+    else if (['profile','profile-settings','profile-password','profile-created','profile-edited'].includes(name)) await profileView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,logout:async()=>{must(await client.auth.signOut());session=null;profile=null;recovery=false;go('#home');}});
     else if (name === 'guide' || name === 'about') infoView(name, content);
     else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (name === 'contact') await contactView(content, token, params);
@@ -143,7 +143,7 @@ function infoView(name, content) {
   const guide = name === 'guide';
   content.className = 'wrap reading-content';
   content.innerHTML = `<a class="back-link" href="#home">← 위키로 돌아가기</a><article class="article info-article"><span class="eyebrow">${guide ? 'YOUR FIRST CHAPTER' : 'ABOUT THIS ARCHIVE'}</span><h1>${guide ? '처음의 동산을 위한<br>작은 길잡이.' : '우리의 오늘을,<br>다음 동산인에게.'}</h1><p class="article-intro">${guide ? '모든 것을 한 번에 알 필요는 없어요.<br>궁금한 이야기부터 하나씩 펼쳐 보세요.' : '학생이 기록하고, 공유하며, 이어가는 학교 정보 플랫폼.<br>안산동산고 디지털 위키를 소개합니다.'}</p>
-  ${guide ? `<div class="info-steps">${categoryDetails.map(([cat, symbol, description, number]) => `<a href="#home?category=${encodeURIComponent(cat)}"><span>${number}</span>${icon(symbol, 26)}<div><h2>${cat}</h2><p>${description}</p></div><b>↗</b></a>`).join('')}</div><div class="notice">실제 학교생활에 관한 최종 안내는 학교의 공식 공지와 규정을 확인해 주세요. 위키는 학생들이 만드는 보조 안내서입니다.</div>` : `<div class="about-body"><h2>함께 만드는 학교의 기록실</h2><p>학교생활 정보, 동아리 소개, 학생 자치 활동, 신입생 가이드와 자주 묻는 질문을 모읍니다. 공식 홈페이지를 대체하기보다 학생들이 궁금해하는 정보를 찾기 쉽게 정리합니다.</p><h2>누구나 제안하고, 운영진이 확인합니다.</h2><p>일반 회원도 새 문서와 공개 문서의 수정안을 작성해 제출할 수 있습니다. 승인 전에는 작성자 본인과 관리자만 볼 수 있으며, 관리자가 승인하면 공개됩니다. 편집자와 관리자는 문서를 직접 게시·수정할 수 있습니다.</p><h2>우리의 기록이 지키는 세 가지</h2><div class="principles"><div><strong>01 사실</strong><p>확인 가능한 정보를 씁니다.</p></div><div><strong>02 출처</strong><p>정보가 온 곳을 남깁니다.</p></div><div><strong>03 존중</strong><p>타인의 개인정보를 보호합니다.</p></div></div>${suggestion ? `<a class="button primary" href="${e(suggestion)}" target="_blank" rel="noopener noreferrer">수정 제안하기 ↗</a>` : '<p class="muted">제안 접수 경로는 운영진이 연결하면 이곳에 표시됩니다.</p>'}<a class="text-link" href="#signup">동산위키에 함께하기 →</a></div>`}</article>`;
+  ${guide ? `<div class="info-steps">${categoryDetails.map(([cat, symbol, description, number]) => `<a href="#home?category=${encodeURIComponent(cat)}"><span>${number}</span>${icon(symbol, 26)}<div><h2>${cat}</h2><p>${description}</p></div><b>↗</b></a>`).join('')}</div><div class="notice">실제 학교생활에 관한 최종 안내는 학교의 공식 공지와 규정을 확인해 주세요. 위키는 학생들이 만드는 보조 안내서입니다.</div>` : `<div class="about-body"><h2>함께 만드는 학교의 기록실</h2><p>학교생활 정보, 동아리 소개, 학생 자치 활동, 신입생 가이드와 자주 묻는 질문을 모읍니다. 공식 홈페이지를 대체하기보다 학생들이 궁금해하는 정보를 찾기 쉽게 정리합니다.</p><h2>누구나 제안하고, 운영진이 확인합니다.</h2><p>일반 회원도 새 문서와 공개 문서의 수정안을 작성해 제출할 수 있습니다. 승인 전에는 작성자 본인과 편집자·관리자만 볼 수 있으며, 심사를 거쳐 승인되면 공개됩니다. 편집자와 관리자는 문서를 직접 게시·수정할 수 있습니다.</p><h2>우리의 기록이 지키는 세 가지</h2><div class="principles"><div><strong>01 사실</strong><p>확인 가능한 정보를 씁니다.</p></div><div><strong>02 출처</strong><p>정보가 온 곳을 남깁니다.</p></div><div><strong>03 존중</strong><p>타인의 개인정보를 보호합니다.</p></div></div>${suggestion ? `<a class="button primary" href="${e(suggestion)}" target="_blank" rel="noopener noreferrer">수정 제안하기 ↗</a>` : '<p class="muted">제안 접수 경로는 운영진이 연결하면 이곳에 표시됩니다.</p>'}<a class="text-link" href="#signup">동산위키에 함께하기 →</a></div>`}</article>`;
 }
 function authView(mode, content) {
   const reset = mode === 'reset', signup = mode === 'signup', forgot = mode === 'forgot';
