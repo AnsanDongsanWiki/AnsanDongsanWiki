@@ -4,6 +4,7 @@ import { icon, categoryDetails, previewPages } from './design.js';
 import '@fontsource-variable/noto-sans-kr';
 import './style.css';
 import { mountAttachmentEditor, renderAttachments, releaseAttachmentUrls } from './attachments.js';
+import { recordPageView, renderPopularDocuments } from './popular.js';
 
 const app = document.querySelector('#app');
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -40,6 +41,7 @@ function route() {
 function go(hash) { if (location.hash === hash) render(); else location.hash = hash; }
 function shell() {
   const current = route().name;
+  const ranked = ['home', 'page', 'edit', 'submit'].includes(current);
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
   <header class="topbar${session ? ' member-topbar' : ''}"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
   <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
@@ -47,7 +49,7 @@ function shell() {
   <a class="button" href="#submissions">내 제출 문서</a><a class="button" href="#contact">관리자에게 문의</a>${profile?.role === 'admin' ? '<a class="button" href="#inquiries">문의 관리</a><a class="button" href="#review">문서 승인</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
-  <main id="main" tabindex="-1"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div></main>
+  <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="많이 본 문서"><div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">같은 브라우저는 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
   <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
   $('#logout')?.addEventListener('click', () => action(async () => {
@@ -75,6 +77,7 @@ async function render() {
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
   shell();
+  renderPopularDocuments(client, $('#popular-documents'), ['edit', 'submit'].includes(route().name));
   window.scrollTo({ top: 0, behavior: 'instant' });
   const content = $('#content');
   const { name, params } = route();
@@ -202,6 +205,9 @@ async function pageView(content, id, token) {
   <div class="body-text">${linkifyText(page.content)}</div><div class="source"><strong>출처</strong><br>${linkifyText(page.source || '출처가 등록되지 않았습니다.')}</div><section id="page-files" class="attachments"></section></article>
   <section><h2>수정 이력 <span class="muted">최근 50개</span></h2>${!client ? '<p class="muted">예시 문서에는 실제 수정 이력이 없습니다.</p>' : ''}${revisions.map(r => `<div class="history-item"><button data-revision="${r.id}">버전 ${r.version} 보기</button> ${e(r.editor_name)} <span class="muted">${date(r.created_at)}</span><div id="revision-${r.id}"></div></div>`).join('')}</section>`;
   renderAttachments(client, $('#page-files'), page.attachment_ids || []);
+  if (client && !page.deleted_at) recordPageView(client, page.id).then(() => {
+    if (token === generation) renderPopularDocuments(client, $('#popular-documents'));
+  });
   $('#delete-page')?.addEventListener('click', () => {
     if (!window.confirm('이 문서를 휴지통으로 옮길까요? 공개 목록과 수정 이력에서 숨겨지고, 관리자가 복구할 수 있습니다.')) return;
     action(async () => {
