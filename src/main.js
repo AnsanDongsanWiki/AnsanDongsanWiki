@@ -44,11 +44,11 @@ function shell() {
   <header class="topbar${session ? ' member-topbar' : ''}"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
   <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a></nav>
   <nav class="actions account-actions" aria-label="계정 메뉴">${session ? `<span class="muted">${e(profile?.nickname || '동산인')}</span>
-  <a class="button" href="#submissions">내 제출 문서</a>${profile?.role === 'admin' ? '<a class="button" href="#review">문서 승인</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
+  <a class="button" href="#submissions">내 제출 문서</a><a class="button" href="#contact">관리자에게 문의</a>${profile?.role === 'admin' ? '<a class="button" href="#inquiries">문의 관리</a><a class="button" href="#review">문서 승인</a><a class="button" href="#trash">휴지통</a><a class="button" href="#admin">권한 관리</a>' : ''}<button id="logout">로그아웃</button>` : '<a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a>'}</nav></div></header>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div></main>
-  <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
+  <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
   $('#logout')?.addEventListener('click', () => action(async () => {
     must(await client.auth.signOut()); session = null; profile = null; recovery = false; go('#home');
@@ -81,6 +81,9 @@ async function render() {
   try {
     if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') authView(name, content);
     else if (name === 'guide' || name === 'about') infoView(name, content);
+    else if (name === 'contact') await contactView(content, token, params);
+    else if (name === 'inquiries') await inquiriesView(content, token, params);
+    else if (name === 'inquiry') await inquiryView(content, token, params);
     else if (name === 'submissions') await submissionsView(content, token);
     else if (name === 'submit') await submissionEditView(content, params.get('id'), token, params.get('target'));
     else if (name === 'trash') await trashView(content, token);
@@ -373,6 +376,73 @@ async function trashView(content, token) {
       go(`#page?id=${row.id}`);
     }, content);
   }));
+}
+
+const inquiryStatus = { open: '답변 대기', answered: '답변 완료' };
+function inquiryUrl(scope, query = '', status = 'open', page = 0, id = '') {
+  const params = new URLSearchParams({ q: query, status, p: String(page) });
+  if (id) { params.set('id', id); params.set('from', 'admin'); }
+  return `#${scope}?${params}`;
+}
+async function contactView(content, token, params) {
+  if (!session || !profile) {
+    content.innerHTML = '<h2>관리자에게 문의</h2><div class="notice">로그인 후 문의를 보내고 답변을 확인할 수 있습니다. 문의는 작성자 본인과 관리자만 볼 수 있습니다.</div><a class="button primary" href="#login">로그인하기</a>';
+    return;
+  }
+  const { page } = managementSearchState(params), size = 20;
+  const result = await client.from('wiki_inquiries').select('id,title,status,created_at', { count: 'exact' }).eq('author_id', session.user.id).order('created_at', { ascending: false }).order('id').range(page * size, page * size + size - 1);
+  const rows = must(result), count = result.count || 0;
+  if (token !== generation) return;
+  if (page > 0 && page * size >= count) { go(`#contact?p=${Math.max(0, Math.ceil(count / size) - 1)}`); return; }
+  content.innerHTML = `<h2>관리자에게 문의</h2><div class="notice">문서 수정 요청, 이용 중 문제, 운영 관련 질문을 보내 주세요. 문의와 답변은 본인과 관리자만 볼 수 있습니다. 비밀번호나 다른 사람의 개인정보는 적지 마세요.</div><form id="inquiry-form" class="form"><label>제목<input name="title" required maxlength="120" placeholder="어떤 도움이 필요한가요?"></label><label>문의 내용<textarea name="body" required maxlength="4000" style="min-height:180px" placeholder="문제가 발생한 문서 주소와 상황 등을 적어 주세요."></textarea></label><p class="muted">최대 4000자 · 24시간에 10건까지 · 답변은 아래 ‘내 문의’에서 확인할 수 있습니다.</p><button class="primary">문의 보내기</button></form><section style="margin-top:40px"><h2>내 문의 <span class="muted">${count}건</span></h2>${rows.length ? rows.map(row => `<div class="member"><div><span class="tag">${inquiryStatus[row.status]}</span><h3>${e(row.title)}</h3><p class="muted">${date(row.created_at)}</p></div><a class="button" href="#inquiry?id=${row.id}">내용·답변 보기</a></div>`).join('') : '<div class="empty">아직 보낸 문의가 없습니다.</div>'}${managementPagination(page, count, size)}</section>`;
+  $('#inquiry-form').addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget, fields = new FormData(form);
+    action(async () => {
+      const id = must(await client.rpc('create_wiki_inquiry', { p_title: fields.get('title'), p_body: fields.get('body') }));
+      go(`#inquiry?id=${id}`);
+    }, form);
+  });
+  $('#management-prev')?.addEventListener('click', () => go(`#contact?p=${page - 1}`));
+  $('#management-next')?.addEventListener('click', () => go(`#contact?p=${page + 1}`));
+}
+async function inquiriesView(content, token, params) {
+  if (profile?.role !== 'admin') { content.innerHTML = '<div class="notice">관리자만 문의 목록을 볼 수 있습니다.</div>'; return; }
+  const { query, page } = managementSearchState(params), size = 24;
+  const status = ['open', 'answered', 'all'].includes(params.get('status')) ? params.get('status') : 'open';
+  let request = client.from('wiki_inquiries').select('id,title,author_name,status,created_at', { count: 'exact' }).order('created_at').order('id');
+  if (status !== 'all') request = request.eq('status', status);
+  if (query) request = request.ilike('title', `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`);
+  const result = await request.range(page * size, page * size + size - 1);
+  const rows = must(result), count = result.count || 0;
+  if (token !== generation) return;
+  if (page > 0 && page * size >= count) { go(inquiryUrl('inquiries', query, status, Math.max(0, Math.ceil(count / size) - 1))); return; }
+  content.innerHTML = `<h2>문의 관리</h2><p class="muted">작성자에게만 답변이 보입니다. 제목을 검색하거나 답변 상태별로 확인할 수 있습니다.</p>${managementSearchForm(query, '문의 제목 검색')}<label>답변 상태 <select id="inquiry-filter" style="padding:8px;margin-left:8px"><option value="open" ${status === 'open' ? 'selected' : ''}>답변 대기</option><option value="answered" ${status === 'answered' ? 'selected' : ''}>답변 완료</option><option value="all" ${status === 'all' ? 'selected' : ''}>전체</option></select></label><p class="muted">${count}건 · 오래된 문의부터 표시됩니다.</p>${rows.length ? rows.map(row => `<div class="member"><div><span class="tag">${inquiryStatus[row.status]}</span><h3>${e(row.title)}</h3><p class="muted">${e(row.author_name)} · ${date(row.created_at)}</p></div><a class="button" href="${e(inquiryUrl('inquiry', query, status, page, row.id))}">확인·답변</a></div>`).join('') : '<div class="empty">조건에 맞는 문의가 없습니다.</div>'}${managementPagination(page, count, size)}`;
+  $('#management-search').addEventListener('submit', event => {
+    event.preventDefault(); go(inquiryUrl('inquiries', String(new FormData(event.currentTarget).get('q') || '').trim().slice(0, 120), status));
+  });
+  $('#management-clear')?.addEventListener('click', () => go(inquiryUrl('inquiries', '', status)));
+  $('#inquiry-filter').addEventListener('change', event => go(inquiryUrl('inquiries', query, event.currentTarget.value)));
+  $('#management-prev')?.addEventListener('click', () => go(inquiryUrl('inquiries', query, status, page - 1)));
+  $('#management-next')?.addEventListener('click', () => go(inquiryUrl('inquiries', query, status, page + 1)));
+}
+async function inquiryView(content, token, params) {
+  if (!session || !profile) { content.innerHTML = '<div class="notice">로그인 후 문의를 확인해 주세요.</div><a class="button" href="#login">로그인하기</a>'; return; }
+  const inquiry = must(await client.from('wiki_inquiries').select('*').eq('id', params.get('id')).maybeSingle());
+  if (token !== generation) return;
+  if (!inquiry) { content.innerHTML = '<div class="notice">문의를 찾을 수 없거나 조회 권한이 없습니다.</div><a href="#contact">내 문의 보기</a>'; return; }
+  const admin = profile.role === 'admin';
+  const { query, page } = managementSearchState(params);
+  const status = ['open', 'answered', 'all'].includes(params.get('status')) ? params.get('status') : 'open';
+  const back = admin && params.get('from') === 'admin' ? inquiryUrl('inquiries', query, status, page) : '#contact';
+  content.className = 'wrap reading-content';
+  content.innerHTML = `<a href="${e(back)}">← ${admin && params.get('from') === 'admin' ? '문의 관리' : '내 문의'}</a><article class="article"><span class="tag">${inquiryStatus[inquiry.status]}</span><h1>${e(inquiry.title)}</h1><p class="muted">${e(inquiry.author_name)} · ${date(inquiry.created_at)}</p><div class="body-text">${linkifyText(inquiry.body)}</div><section class="source"><h2>관리자 답변</h2>${inquiry.status === 'answered' ? `<p class="muted">${date(inquiry.replied_at)}</p><div class="body-text">${linkifyText(inquiry.reply)}</div>` : '<p>문의가 접수되었습니다. 관리자가 확인한 후 이곳에 답변이 표시됩니다.</p>'}</section></article>${admin ? `<h2 style="margin-top:28px">${inquiry.status === 'answered' ? '답변 수정' : '답변 작성'}</h2><form id="inquiry-reply" class="form"><label>작성자에게 보낼 답변<textarea name="reply" required maxlength="4000" style="min-height:180px">${e(inquiry.reply)}</textarea></label><button class="primary">${inquiry.status === 'answered' ? '답변 수정 저장' : '답변 등록'}</button></form>` : ''}`;
+  $('#inquiry-reply')?.addEventListener('submit', event => {
+    event.preventDefault(); const form = event.currentTarget, fields = new FormData(form);
+    action(async () => {
+      must(await client.rpc('reply_wiki_inquiry', { p_id: inquiry.id, p_reply: fields.get('reply'), p_version: inquiry.version }));
+      await render();
+    }, form);
+  });
 }
 
 window.addEventListener('hashchange', render);
