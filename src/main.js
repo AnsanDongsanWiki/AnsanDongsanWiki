@@ -1,3 +1,4 @@
+import { documentSortOptions, listingState, listingUrl, loadDocumentListing } from './listing.js';
 import { profileView } from './profile.js';
 import { qnaView } from './qna.js';
 import { createClient } from '@supabase/supabase-js';
@@ -105,39 +106,31 @@ async function render() {
   }
 }
 async function homeView(content, params, token) {
-  const category = categories.includes(params.get('category')) ? params.get('category') : '';
-  const query = (params.get('q') || '').slice(0, 120);
-  const page = Math.max(0, Math.min(10000, Number.parseInt(params.get('p'), 10) || 0));
-  let pages, count;
-  if (client) {
-    let request = client.from('pages').select('id,title,category,updated_at', { count: 'exact' }).is('deleted_at', null).order('updated_at', { ascending: false }).order('id');
-    if (category) request = request.eq('category', category);
-    if (query) request = request.ilike('title', `%${query.replace(/[\\%_]/g, c => `\\${c}`)}%`);
-    const result = await request.range(page * 24, page * 24 + 23);
-    pages = must(result); count = result.count || 0;
-  } else {
-    const matches = previewPages.filter(p => (!category || p.category === category) && p.title.toLocaleLowerCase('ko-KR').includes(query.toLocaleLowerCase('ko-KR')));
-    pages = matches.slice(page * 24, page * 24 + 24); count = matches.length;
-  }
+  const state = listingState(params);
+  const {category, query, sort, page} = state;
+  const {pages, count} = await loadDocumentListing(client, state, previewPages);
   if (token !== generation) return;
+  if (page > 0 && !pages.length) { go(listingUrl(state, {page:0})); return; }
   const filtering = !!category || !!query;
   content.className = 'wrap home-content';
   content.innerHTML = `<section class="hero"><div class="hero-copy"><span class="eyebrow"><span class="tiny-line"></span> OUR DAYS, OUR ARCHIVE</span><h1>동산의 하루가,<br>우리의 <span class="hero-word">기록</span>이 되다.</h1><p>처음이라 궁금한 것부터, 오래 기억하고 싶은 순간까지.<br>동산인이 함께 쓰는 가장 가까운 학교생활 안내서.</p><a href="#guide" class="text-link">동산위키가 처음이라면 ${icon('arrow', 19)}</a><div class="hero-signature"><span>기록은 남고, 이야기는 이어지니까.</span><span class="signature-line"></span></div></div>
   <figure class="hero-art"><div class="art-label">FIELD NOTES <span>No. 001</span></div><img src="/archive-illustration.svg" alt="펼친 책 위에 학교와 나무가 솟아 있는 상상 일러스트" width="620" height="530"><figcaption>THE LITTLE THINGS THAT MAKE OUR SCHOOL.</figcaption></figure>
   <div class="hero-bottom"><span class="hero-bottom-label">우리 학교가 궁금할 때</span><form class="search" id="search">${icon('search', 23)}<input name="q" aria-label="문서 제목 검색" maxlength="120" placeholder="궁금한 동산의 이야기를 검색해 보세요" value="${e(query)}"><kbd aria-hidden="true">Enter ↵</kbd><button class="primary" aria-label="검색">${icon('arrow', 23)}</button></form><div class="quick-search"><span>빠르게 찾기</span><button data-query="기숙사">기숙사</button><button data-query="동아리">동아리</button><button data-query="신입생">신입생 안내</button></div></div></section>
   <section class="category-section" aria-label="주제별 바로가기"><div class="category-heading"><span class="eyebrow">FIND YOUR CHAPTER</span><h2>어떤 이야기를 찾고 있나요?</h2></div><div class="category-grid">${categoryDetails.map(([cat, symbol, description, number]) => `<button class="category-tile ${cat === category ? 'selected' : ''}" data-category="${cat}"><span class="tile-top">${icon(symbol, 27)}<span>${number}</span></span><strong>${cat}</strong><span class="tile-desc">${description}</span><span class="tile-arrow">↗</span></button>`).join('')}</div></section>
-  <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${session ? `<a class="button primary" href="${canEdit(profile) ? '#edit' : '#submit'}">${canEdit(profile) ? '문서 작성 +' : '문서 작성·제출 +'}</a>` : filtering ? '<a class="text-link" href="#home">전체 문서 보기 ↗</a>' : '<span class="muted">'+ (client ? '최근 수정 순' : '미리보기용 예시') +'</span>'}</div>
-  ${pages.length ? `<div class="document-list">${pages.map((p, index) => `<a class="document-row" href="#page?id=${encodeURIComponent(p.id)}"><span class="doc-index">${String(page * 24 + index + 1).padStart(2, '0')}</span><div class="doc-info"><span class="doc-category">${e(p.category)}</span><h3>${e(p.title)}</h3>${p.description ? `<p>${e(p.description)}</p>` : ''}</div><span class="doc-date">${client ? date(p.updated_at) : '예시 문서'}</span><span class="doc-arrow">↗</span></a>`).join('')}</div>` : `<div class="empty">${icon('book', 34)}<h3>${filtering ? '아직 이 이야기를 찾지 못했어요.' : '첫 번째 기록을 기다리고 있어요.'}</h3><p>${filtering ? '다른 검색어나 분류로 찾아보세요.' : '운영진이 확인한 이야기부터 차근차근 채워갈 예정입니다.'}</p><a class="text-link" href="#home">전체 문서로 돌아가기 →</a></div>`}
+  <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${session ? `<a class="button primary" href="${canEdit(profile) ? '#edit' : '#submit'}">${canEdit(profile) ? '문서 작성 +' : '문서 작성·제출 +'}</a>` : filtering ? `<a class="text-link" href="${e(listingUrl(state, {category:'', query:'', page:0}))}">전체 문서 보기 ↗</a>` : '<span class="muted">'+ (client ? documentSortOptions[sort] : '미리보기용 예시') +'</span>'}</div>
+  <div class="document-toolbar"><p class="muted">${sort === 'views' ? '조회순 · 최근 7일(오늘 포함) 조회수 기준' : '최신순·오래된순은 최근 수정일 기준'}</p><label for="document-sort">정렬<select id="document-sort">${Object.entries(documentSortOptions).map(([value,label]) => `<option value="${value}" ${sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label></div>
+  ${pages.length ? `<div class="document-list">${pages.map((p, index) => `<a class="document-row" href="#page?id=${encodeURIComponent(p.id)}"><span class="doc-index">${String(page * 24 + index + 1).padStart(2, '0')}</span><div class="doc-info"><span class="doc-category">${e(p.category)}</span><h3>${e(p.title)}</h3>${p.description ? `<p>${e(p.description)}</p>` : ''}</div><span class="doc-date">${client ? sort === 'views' ? `${Number(p.views).toLocaleString('ko-KR')}회<br><small>최근 7일</small>` : date(p.updated_at) : '예시 문서'}</span><span class="doc-arrow">↗</span></a>`).join('')}</div>` : `<div class="empty">${icon('book', 34)}<h3>${filtering ? '아직 이 이야기를 찾지 못했어요.' : '첫 번째 기록을 기다리고 있어요.'}</h3><p>${filtering ? '다른 검색어나 분류로 찾아보세요.' : '운영진이 확인한 이야기부터 차근차근 채워갈 예정입니다.'}</p><a class="text-link" href="${e(listingUrl(state, {category:'', query:'', page:0}))}">전체 문서로 돌아가기 →</a></div>`}
   ${count > 24 ? `<div class="pagination"><button id="prev" ${page === 0 ? 'disabled' : ''}>← 이전</button><span>${page + 1}</span><button id="next" ${(page + 1) * 24 >= count ? 'disabled' : ''}>다음 →</button></div>` : ''}</section></div>
   <section class="guide-banner"><div class="guide-book" aria-hidden="true"><span>DONGSAN<br>FIELD<br>GUIDE</span><b>${icon('leaf', 35)}</b><small>FOR YOUR FIRST CHAPTER</small></div><div class="guide-copy"><span class="eyebrow">A LITTLE HELP FOR A NEW BEGINNING</span><h2>처음의 동산이,<br>조금 더 익숙해지도록.</h2><p>새로운 시작에 필요한 이야기들을 차근차근 모았습니다.<br>어디서 시작할지 모르겠다면, 이곳부터 펼쳐 보세요.</p><a class="button light" href="#guide">신입생을 위한 첫 안내서 ${icon('arrow', 18)}</a></div><span class="banner-number" aria-hidden="true">01</span></section>
   <section class="participation"><div>${icon('pen', 25)}<h2>당신이 아는 동산의 이야기를 더해주세요.</h2><p>작은 수정 하나도 다음 동산인에게는 큰 도움이 됩니다.</p></div>${suggestion ? `<a class="text-link" href="${e(suggestion)}" target="_blank" rel="noopener noreferrer">수정 제안하기 ${icon('arrow', 20)}</a>` : '<a class="text-link" href="#about">함께 기록하는 방법 알아보기 →</a>'}</section>`;
-  const navigate = (cat, q, p = 0) => go(`#home?${new URLSearchParams({ category: cat, q, p })}`);
+  const navigate = (cat, q, p = 0) => go(listingUrl(state, {category:cat, query:String(q || ''), page:p}));
+  $('#document-sort').addEventListener('change', event => go(listingUrl(state, {sort:event.currentTarget.value, page:0})));
   $('#search').addEventListener('submit', event => { event.preventDefault(); navigate(category, new FormData(event.currentTarget).get('q')); });
   document.querySelectorAll('[data-category]').forEach(button => button.addEventListener('click', () => navigate(button.dataset.category, query)));
   document.querySelectorAll('[data-query]').forEach(button => button.addEventListener('click', () => navigate('', button.dataset.query)));
   $('#prev')?.addEventListener('click', () => navigate(category, query, page - 1));
   $('#next')?.addEventListener('click', () => navigate(category, query, page + 1));
-  if (filtering || page) $('#archive').scrollIntoView({ block: 'start', behavior: 'instant' });
+  if (filtering || page || sort !== 'latest') $('#archive').scrollIntoView({ block: 'start', behavior: 'instant' });
 }
 function infoView(name, content) {
   const guide = name === 'guide';
