@@ -9,8 +9,8 @@ export function profileMenu(profile) {
  const group=(title,items)=>`<section class="profile-group"><h2>${title}</h2><div class="profile-menu">${items}</div></section>`;
  return group('계정',item('#profile-settings','계정 설정','로그인 계정 확인과 닉네임 변경','club')+item('#profile-password','비밀번호 변경','현재 비밀번호를 확인하고 변경','lock'))
  +group('일반',item('#profile-created','작성한 문서(게시)','내가 처음 게시한 공개 문서','book')+item('#profile-edited','참여한 문서(수정)','내가 수정에 참여한 공개 문서','pen')+item('#submissions','내 제출 문서','승인 대기·반려된 문서 확인','clock'))
- +(canEdit(profile)?group('편집자',item('#review','문서 승인','새 문서와 수정안 심사','curriculum')+item('#qna-review','Q&A 승인','질문과 답변 심사','faq')):'')
- +(profile?.role==='admin'?group('관리자',item('#inquiries','문의 승인','접수된 문의 확인과 답변','faq')+item('#trash','휴지통','삭제된 문서 확인과 복구','other')+item('#admin','권한 관리','회원 역할 확인과 변경','council')):'');
+ +(canEdit(profile)?group('편집자',item('#review','문서 승인','새 문서와 수정안 심사','curriculum')+item('#qna-review','Q&A 질문 승인','질문 승인과 반려','faq')):'')
+ +(profile?.role==='admin'?group('관리자',item('#qna-review?kind=answer','Q&A 답변 관리','답변 확인과 삭제','faq')+item('#inquiries','문의 승인','접수된 문의 확인과 답변','faq')+item('#trash','휴지통','삭제된 문서 확인과 복구','other')+item('#admin','권한 관리','회원 역할 확인과 변경','council')):'');
 }
 export async function changeProfilePassword(client,currentPassword,password,confirm) {
  validatePassword(password);

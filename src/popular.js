@@ -1,46 +1,44 @@
 import {escapeHtml as e} from './core.js';
-const VIEWER_KEY = 'dongsan-wiki:viewer:v1';
-const RECEIPT_KEY = 'dongsan-wiki:view-receipts:v1';
+const RECEIPT_KEY = 'dongsan-wiki:account-view-receipts:v2:';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-let fallbackKey = null;
-let memoryReceipts = { day: '', seen: [] };
+const memoryReceipts = new Map();
 const inFlight = new Map();
 export function koreaViewDay(date = new Date()) {
   return new Date(date.getTime() + 9 * 3600000).toISOString().slice(0, 10);
 }
-function viewerKey() {
+function receipts(day, userId) {
+  let state = memoryReceipts.get(userId);
   try {
-    const saved = localStorage.getItem(VIEWER_KEY);
-    if (saved && UUID.test(saved)) return saved;
-  } catch { /* Browser storage is optional; database deduplication remains active. */ }
-  if (!fallbackKey) fallbackKey = crypto.randomUUID();
-  try { localStorage.setItem(VIEWER_KEY, fallbackKey); } catch {}
-  return fallbackKey;
-}
-function receipts(day) {
-  try {
-    const saved = JSON.parse(localStorage.getItem(RECEIPT_KEY) || 'null');
+    const saved = JSON.parse(localStorage.getItem(RECEIPT_KEY + userId) || 'null');
     if (saved?.day === day && Array.isArray(saved.seen)) {
-      memoryReceipts = { day, seen: saved.seen.filter(id => typeof id === 'string' && UUID.test(id)).slice(-5000) };
+      state = { day, seen: saved.seen.filter(id => typeof id === 'string' && UUID.test(id)).slice(-5000) };
     }
   } catch {}
-  if (memoryReceipts.day !== day) memoryReceipts = { day, seen: [] };
-  return memoryReceipts;
+  if (state?.day !== day) state = { day, seen: [] };
+  memoryReceipts.set(userId, state);
+  return state;
 }
 export async function recordPageView(client, pageId) {
   if (!client || !UUID.test(pageId || '')) return;
+  let userId;
+  try {
+    const result = await client.auth.getSession();
+    if (result.error) return;
+    userId = result.data?.session?.user?.id;
+  } catch { return; }
+  if (!UUID.test(userId || '')) return;
   const day = koreaViewDay();
-  if (receipts(day).seen.includes(pageId)) return;
-  const flightKey = `${day}:${pageId}`;
+  if (receipts(day, userId).seen.includes(pageId)) return;
+  const flightKey = `${day}:${userId}:${pageId}`;
   if (inFlight.has(flightKey)) return inFlight.get(flightKey);
   const task = (async () => {
-    const result = await client.rpc('record_wiki_page_view', { p_page_id: pageId, p_viewer_key: viewerKey() });
+    const result = await client.rpc('record_wiki_page_view', { p_page_id: pageId });
     if (result.error) return;
-    // false can also mean that the database already counted this browser today.
-    const state = receipts(day);
+    // The database uses the verified account, even if browser storage is cleared.
+    const state = receipts(day, userId);
     if (!state.seen.includes(pageId)) state.seen.push(pageId);
     state.seen = state.seen.slice(-5000);
-    try { localStorage.setItem(RECEIPT_KEY, JSON.stringify(state)); } catch {}
+    try { localStorage.setItem(RECEIPT_KEY + userId, JSON.stringify(state)); } catch {}
   })().catch(() => {}).finally(() => inFlight.delete(flightKey));
   inFlight.set(flightKey, task);
   return task;
