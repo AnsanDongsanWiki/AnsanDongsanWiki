@@ -32,3 +32,6 @@
 
 /* Account withdrawal */
 .withdrawal-card{border-color:#d8b6a8}.withdrawal-card h2{font-size:21px}.withdrawal-card ul{padding-left:22px;margin:18px 0 28px;line-height:1.95;font-size:13px;color:var(--muted)}.withdrawal-card li+li{margin-top:10px}.withdrawal-submit{background:#824735;border-color:#824735;color:#fff}.withdrawal-submit:hover{background:#6b3728}.withdrawal-card .form{max-width:520px}.withdrawal-card input[type=checkbox]{width:auto}
+
+/* Main scripture: light italic, right aligned. */
+.hero-scripture{align-self:center;justify-self:end;width:100%;max-width:470px;min-width:0;margin:0;padding:52px 12px 44px 26px;text-align:right;color:var(--green)}.hero-scripture blockquote{margin:0;font-size:clamp(23px,2.6vw,33px);font-weight:300;font-style:italic;font-synthesis:style;line-height:1.95;letter-spacing:-.8px;word-break:keep-all;overflow-wrap:break-word}.hero-scripture figcaption{margin-top:24px;font-size:12px;font-weight:300;letter-spacing:1px;color:var(--muted)}@media(max-width:720px){.hero-scripture{grid-row:2;max-width:100%;padding:30px 4px 26px 10px}.hero-scripture blockquote{font-size:clamp(20px,5.4vw,28px);line-height:1.95;letter-spacing:-.5px}.hero-scripture figcaption{font-size:11px;margin-top:16px}}
