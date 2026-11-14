@@ -21,9 +21,14 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'sha256-w845VVhC3uF+xxsHQ4oq9aCsxMKzLcs0sfSDsPIM2Ik='; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+          "value": "default-src 'self'; script-src 'self' 'sha256-w845VVhC3uF+xxsHQ4oq9aCsxMKzLcs0sfSDsPIM2Ik='; style-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
         }
       ]
     }
-  ]
+  ],
+  "functions": {
+    "api/delete-account.js": {
+      "maxDuration": 60
+    }
+  }
 }
