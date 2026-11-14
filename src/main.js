@@ -8,6 +8,7 @@ import '@fontsource-variable/noto-sans-kr';
 import './style.css';
 import { mountAttachmentEditor, renderAttachments, releaseAttachmentUrls } from './attachments.js';
 import { recordPageView, renderPopularDocuments } from './popular.js';
+import { verificationView, needsVerification, releaseVerificationUrls } from './verification.js';
 
 const app = document.querySelector('#app');
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -17,6 +18,7 @@ const recoveryArrival = new URLSearchParams(location.hash.slice(1)).get('type') 
 const client = url && key && !url.includes('YOUR_PROJECT') && !key.includes('YOUR_')
   ? createClient(url, key) : null;
 let session = null, profile = null, generation = 0, busy = false, recovery = recoveryArrival;
+const schoolHomepage = 'https://ansandongsan-h.goeas.kr/ansandongsan-h/main.do';
 const roles = { reader: '일반 회원', editor: '편집자', admin: '관리자' };
 const date = value => new Date(value).toLocaleString('ko-KR');
 const $ = selector => document.querySelector(selector);
@@ -47,13 +49,13 @@ function shell() {
   const ranked = ['home', 'page', 'edit', 'submit'].includes(current);
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
   <header class="topbar profile-topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
-  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
+  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#home?list=1" class="archive-nav-link ${current==='home'&&route().params.get('list')==='1'?'active':''}">학교의 모든 이야기</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
   ${!session ? '<nav class="actions account-actions" aria-label="계정 메뉴"><a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a></nav>' : ''}</div></header>
   <a class="contact-float" href="#contact" aria-label="관리자에게 문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H7l-5 3 1.5-6A8 8 0 0 1 3 11a9 9 0 0 1 18 0Z"/><path d="M7 10h10M7 14h6"/></svg><span>문의하기</span></a>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
   <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="많이 본 문서"><div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">로그인 계정당 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
-  <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
+  <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><a class="school-homepage" href="${schoolHomepage}" target="_blank" rel="noopener noreferrer" aria-label="동산고 공식 홈페이지 (새 탭)">동산고 공식 홈페이지 <span aria-hidden="true">↗</span></a><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
 
 }
@@ -66,7 +68,7 @@ async function action(fn, form) {
   finally { busy = false; controls.forEach(button => { button.disabled = false; }); }
 }
 async function refreshProfile() {
-  profile = session ? must(await client.from('profiles').select('id,nickname,role').eq('id', session.user.id).single()) : null;
+  profile = session ? must(await client.from('profiles').select('id,nickname,role,membership_status').eq('id', session.user.id).single()) : null;
 }
 function sidebar(active) {
   return `<aside class="sidebar" aria-label="문서 분류"><span class="eyebrow">BROWSE THE ARCHIVE</span><h2>학교의 모든 이야기</h2><button data-category="" class="${!active ? 'active' : ''}">${icon('book', 18)} 전체 문서 <span>↗</span></button>
@@ -75,6 +77,9 @@ function sidebar(active) {
 }
 async function render() {
   releaseAttachmentUrls();
+  releaseVerificationUrls();
+  const publicRoutes=['verify','home','page','qna','qna-question','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
+  if(session&&needsVerification(profile)&&!publicRoutes.includes(route().name)){go('#verify');return;}
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
   shell();
@@ -83,8 +88,9 @@ async function render() {
   const content = $('#content');
   const { name, params } = route();
   try {
-    if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') authView(name, content);
-    else if (['profile','profile-settings','profile-password','profile-created','profile-edited'].includes(name)) await profileView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,logout:async()=>{must(await client.auth.signOut());session=null;profile=null;recovery=false;go('#home');}});
+    if (name === 'verify' || name === 'verification-review') await verificationView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,logout:async()=>{must(await client.auth.signOut());session=null;profile=null;go('#login');}});
+    else if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') {authView(name, content);if(name==='login'&&params.get('withdrawn')==='1')notify('회원탈퇴가 완료되었습니다.');}
+    else if (['profile','profile-settings','profile-password','profile-created','profile-edited','profile-withdraw'].includes(name)) await profileView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,onWithdrawn:()=>{session=null;profile=null;recovery=false;go('#login?withdrawn=1');},logout:async()=>{must(await client.auth.signOut());session=null;profile=null;recovery=false;go('#home');}});
     else if (name === 'guide' || name === 'about') infoView(name, content);
     else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (name === 'contact') await contactView(content, token, params);
@@ -114,7 +120,7 @@ async function homeView(content, params, token) {
   const filtering = !!category || !!query;
   content.className = 'wrap home-content';
   content.innerHTML = `<section class="hero"><div class="hero-copy"><span class="eyebrow"><span class="tiny-line"></span> OUR DAYS, OUR ARCHIVE</span><h1>동산의 하루가,<br>우리의 <span class="hero-word">기록</span>이 되다.</h1><p>처음이라 궁금한 것부터, 오래 기억하고 싶은 순간까지.<br>동산인이 함께 쓰는 가장 가까운 학교생활 안내서.</p><a href="#guide" class="text-link">동산위키가 처음이라면 ${icon('arrow', 19)}</a><div class="hero-signature"><span>기록은 남고, 이야기는 이어지니까.</span><span class="signature-line"></span></div></div>
-  <figure class="hero-art"><div class="art-label">FIELD NOTES <span>No. 001</span></div><img src="/archive-illustration.svg" alt="펼친 책 위에 학교와 나무가 솟아 있는 상상 일러스트" width="620" height="530"><figcaption>THE LITTLE THINGS THAT MAKE OUR SCHOOL.</figcaption></figure>
+  <figure class="hero-art school-emblem"><img src="/school-logo.png" alt="안산동산고등학교 교표" width="1346" height="1168" fetchpriority="high"><figcaption>ANSAN DONGSAN HIGH SCHOOL</figcaption></figure>
   <div class="hero-bottom"><span class="hero-bottom-label">우리 학교가 궁금할 때</span><form class="search" id="search">${icon('search', 23)}<input name="q" aria-label="문서 제목 검색" maxlength="120" placeholder="궁금한 동산의 이야기를 검색해 보세요" value="${e(query)}"><kbd aria-hidden="true">Enter ↵</kbd><button class="primary" aria-label="검색">${icon('arrow', 23)}</button></form><div class="quick-search"><span>빠르게 찾기</span><button data-query="기숙사">기숙사</button><button data-query="동아리">동아리</button><button data-query="신입생">신입생 안내</button></div></div></section>
   <section class="category-section" aria-label="주제별 바로가기"><div class="category-heading"><span class="eyebrow">FIND YOUR CHAPTER</span><h2>어떤 이야기를 찾고 있나요?</h2></div><div class="category-grid">${categoryDetails.map(([cat, symbol, description, number]) => `<button class="category-tile ${cat === category ? 'selected' : ''}" data-category="${cat}"><span class="tile-top">${icon(symbol, 27)}<span>${number}</span></span><strong>${cat}</strong><span class="tile-desc">${description}</span><span class="tile-arrow">↗</span></button>`).join('')}</div></section>
   <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${session ? `<a class="button primary" href="${canEdit(profile) ? '#edit' : '#submit'}">${canEdit(profile) ? '문서 작성 +' : '문서 작성·제출 +'}</a>` : filtering ? `<a class="text-link" href="${e(listingUrl(state, {category:'', query:'', page:0}))}">전체 문서 보기 ↗</a>` : '<span class="muted">'+ (client ? documentSortOptions[sort] : '미리보기용 예시') +'</span>'}</div>
@@ -153,7 +159,7 @@ function authView(mode, content) {
   ${signup ? '<label><span><input type="checkbox" name="ack" required> 닉네임이 수정 이력에 공개되며, 개인정보를 문서에 게시할 수 없음을 확인했습니다.</span></label>' : ''}
   <button class="primary">${reset ? '비밀번호 변경' : signup ? '가입하기' : forgot ? '재설정 이메일 받기' : '로그인'}</button></form>
   ${!client ? '<p class="preview-auth">디자인 미리보기입니다. 실제 계정 등록·인증은 연결 후 가능합니다.</p>' : ''}
-  <p class="muted">${signup ? '가입 후 인증 이메일의 링크를 눌러 주세요. 일반 회원의 제출 문서는 관리자 승인 후 공개됩니다.' : ''}</p>
+  <p class="muted">${signup ? '이메일 인증 후 로그인하면 본인인증 화면으로 이동합니다. 리로스쿨 마이페이지 캡처 또는 사진을 제출하고 관리자 가입 승인을 받아 주세요.' : ''}</p>
   ${!reset ? '<div class="actions"><a href="#forgot">비밀번호 찾기</a><a href="#home">위키 둘러보기</a></div>' : ''}</section>`;
   if (!client) $('#auth-form button.primary').disabled = true;
   $('#auth-form').addEventListener('submit', event => {
@@ -170,8 +176,9 @@ function authView(mode, content) {
       if (signup) {
         const nickname = String(fields.get('nickname')).trim();
         if (nickname.length < 2 || nickname.length > 30) throw new Error('닉네임은 2~30자로 입력해 주세요.');
-        must(await client.auth.signUp({ email, password, options: { data: { nickname }, emailRedirectTo: returnUrl() } }));
-        form.reset(); notify('가입 요청을 접수했습니다. 이메일 인증을 완료해 주세요. 메일이 없다면 스팸함이나 기존 가입 여부를 확인해 주세요.');
+        const data=must(await client.auth.signUp({ email, password, options: { data: { nickname }, emailRedirectTo: returnUrl() } }));
+        if(data.session){session=data.session;await refreshProfile();go('#verify');}
+        else{form.reset();notify('이메일 인증을 완료한 뒤 로그인해 주세요. 다음으로 리로스쿨 마이페이지 자료를 제출하면 관리자가 가입을 승인합니다. 메일이 없다면 스팸함이나 기존 가입 여부를 확인해 주세요.');}
       } else if (forgot) {
         must(await client.auth.resetPasswordForEmail(email, { redirectTo: returnUrl() }));
         notify('해당 이메일로 가입되어 있다면 재설정 메일이 발송됩니다. 스팸함도 확인해 주세요.');
@@ -180,7 +187,7 @@ function authView(mode, content) {
         must(await client.auth.signOut()); session = null; profile = null; go('#login');
       } else {
         const data = must(await client.auth.signInWithPassword({ email, password }));
-        session = data.session; await refreshProfile(); go('#home');
+        session = data.session; await refreshProfile(); go(needsVerification(profile)?'#verify':'#home');
       }
     }, form);
   });
@@ -463,6 +470,7 @@ async function boot() {
     const data = must(await client.auth.getSession()); session = data.session;
     await refreshProfile();
     if (recovery && session) location.hash = '#reset';
+    else if(session&&needsVerification(profile))location.hash='#verify';
     await render();
   } catch (error) { shell(); $('#content').innerHTML = '<div class="notice">계정 정보를 불러오지 못했습니다. Supabase SQL 설정을 확인한 뒤 새로고침해 주세요.</div>'; notify(friendly(error), true); }
 }

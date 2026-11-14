@@ -1,5 +1,6 @@
 import {escapeHtml as e,canEdit,validatePassword} from './core.js';
 import {icon} from './design.js';
+import {withdrawAccount} from './account.js';
 const must=result=>{if(result.error)throw result.error;return result.data;};
 const $=selector=>document.querySelector(selector);
 const roles={reader:'일반 회원',editor:'편집자',admin:'관리자'};
@@ -7,10 +8,10 @@ const person='<svg viewBox="0 0 48 48" fill="none" aria-hidden="true"><circle cx
 export function profileMenu(profile) {
  const item=(href,title,description,symbol)=>`<a class="profile-menu-item" href="${href}"><span class="profile-item-icon">${icon(symbol,21)}</span><span><strong>${title}</strong><small>${description}</small></span><span class="profile-chevron" aria-hidden="true">↗</span></a>`;
  const group=(title,items)=>`<section class="profile-group"><h2>${title}</h2><div class="profile-menu">${items}</div></section>`;
- return group('계정',item('#profile-settings','계정 설정','로그인 계정 확인과 닉네임 변경','club')+item('#profile-password','비밀번호 변경','현재 비밀번호를 확인하고 변경','lock'))
+ return group('계정',item('#profile-settings','계정 설정','로그인 계정 확인과 닉네임 변경','club')+item('#profile-password','비밀번호 변경','현재 비밀번호를 확인하고 변경','lock')+item('#profile-withdraw','회원탈퇴','계정과 비공개 정보 삭제','lock'))
  +group('일반',item('#profile-created','작성한 문서(게시)','내가 처음 게시한 공개 문서','book')+item('#profile-edited','참여한 문서(수정)','내가 수정에 참여한 공개 문서','pen')+item('#submissions','내 제출 문서','승인 대기·반려된 문서 확인','clock'))
  +(canEdit(profile)?group('편집자',item('#review','문서 승인','새 문서와 수정안 심사','curriculum')+item('#qna-review','Q&A 질문 승인','질문 승인과 반려','faq')):'')
- +(profile?.role==='admin'?group('관리자',item('#qna-review?kind=answer','Q&A 답변 관리','답변 확인과 삭제','faq')+item('#inquiries','문의 승인','접수된 문의 확인과 답변','faq')+item('#trash','휴지통','삭제된 문서 확인과 복구','other')+item('#admin','권한 관리','회원 역할 확인과 변경','council')):'');
+ +(profile?.role==='admin'?group('관리자',item('#verification-review','회원가입 승인','리로스쿨 인증 자료 확인','lock')+item('#qna-review?kind=answer','Q&A 답변 관리','답변 확인과 삭제','faq')+item('#inquiries','문의 승인','접수된 문의 확인과 답변','faq')+item('#trash','휴지통','삭제된 문서 확인과 복구','other')+item('#admin','권한 관리','회원 역할 확인과 변경','council')):'');
 }
 export async function changeProfilePassword(client,currentPassword,password,confirm) {
  validatePassword(password);
@@ -23,13 +24,27 @@ export async function changeProfilePassword(client,currentPassword,password,conf
  if(signed.data.user?.id!==user.id)throw new Error('로그인 계정이 변경됐습니다. 새로고침해 주세요.');
  must(await client.auth.updateUser({password}));
 }
-export async function profileView({name,params,content,client,session,profile,isCurrent,go,action,notify,refreshProfile,logout}) {
+export async function profileView({name,params,content,client,session,profile,isCurrent,go,action,notify,refreshProfile,logout,onWithdrawn}) {
  content.className='wrap profile-content';
  if(!client||!session){
   content.innerHTML='<section class="profile-guest"><span class="eyebrow">YOUR OWN CHAPTER</span><h1>나의 동산위키</h1><p>로그인하면 계정 설정과 참여한 문서를 확인할 수 있어요.</p><a class="button primary" href="#login">로그인하기</a></section>';return;
  }
  const identity=`<div class="profile-identity"><div class="profile-avatar">${person}</div><h1>${e(profile?.nickname||'동산인')}</h1><span class="tag">${roles[profile?.role]||'일반 회원'}</span></div>`;
  const heading=(title,description)=>`<a class="back-link" href="#profile">← 프로필</a><div class="profile-page-heading"><span class="eyebrow">MY DONGSAN WIKI</span><h1>${title}</h1><p class="muted">${description}</p></div>`;
+ if(name==='profile-withdraw'){
+  content.innerHTML=heading('회원탈퇴','본인 확인 후 로그인 계정과 회원 정보를 삭제합니다.')+`<section class="profile-settings-card withdrawal-card"><h2>탈퇴 전에 확인해 주세요.</h2><ul><li>로그인 계정, 프로필, 비공개 제출물·문의·인증 자료가 삭제됩니다.</li><li>공개된 문서·질문·답변과 공동 기록의 첨부파일은 유지되며 작성자 표시는 ‘탈퇴한 회원’으로 바뀝니다. 게시물 본문은 자동으로 바뀌지 않습니다.</li><li>삭제한 계정은 복구할 수 없습니다. 마지막 관리자는 다른 관리자에게 권한을 넘긴 후 탈퇴할 수 있습니다.</li></ul><form id="withdrawal-form" class="form"><label>현재 비밀번호<input name="password" type="password" autocomplete="current-password" maxlength="128" required></label><label>확인 문구<input name="confirmation" autocomplete="off" placeholder="회원탈퇴" required></label><label><span><input type="checkbox" name="ack" required> 위 내용을 확인했으며 회원탈퇴에 동의합니다.</span></label><div class="actions"><button class="withdrawal-submit">계정 삭제하고 탈퇴</button><a class="button" href="#profile">취소</a></div><p class="muted">처리 중에는 글쓰기가 제한됩니다. 실패 안내가 나오면 같은 계정으로 이 화면에서 다시 시도해 주세요.</p></form></section>`;
+  $('#withdrawal-form').addEventListener('submit',event=>{
+   event.preventDefault();const form=event.currentTarget;
+   action(async()=>{
+    const fields=new FormData(form);
+    if(!fields.get('ack'))throw new Error('회원탈퇴 안내를 확인해 주세요.');
+    if(!window.confirm('계정과 비공개 정보를 삭제하고 탈퇴할까요? 삭제한 계정은 복구할 수 없습니다.'))return;
+    try{await withdrawAccount(client,String(fields.get('password')||''),String(fields.get('confirmation')||''));}
+    finally{form.querySelector('[name="password"]').value='';}
+    if(onWithdrawn)onWithdrawn();else go('#login?withdrawn=1');
+   },form);
+  });return;
+ }
  if(name==='profile'){
   content.innerHTML=`<div class="profile-intro"><span class="eyebrow">YOUR OWN CHAPTER</span>${identity}</div><div class="profile-groups">${profileMenu(profile)}</div><div class="profile-signout"><button id="profile-logout">로그아웃</button></div>`;
   $('#profile-logout').addEventListener('click',()=>action(logout));return;
