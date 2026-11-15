@@ -9,6 +9,7 @@ import './style.css';
 import { mountAttachmentEditor, renderAttachments, releaseAttachmentUrls } from './attachments.js';
 import { recordPageView, renderPopularDocuments } from './popular.js';
 import { verificationView, needsVerification, releaseVerificationUrls } from './verification.js';
+import { mountCalendar, calendarView } from './calendar.js';
 
 const app = document.querySelector('#app');
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -47,6 +48,7 @@ function go(hash) { if (location.hash === hash) render(); else location.hash = h
 function shell() {
   const current = route().name;
   const ranked = ['home', 'page', 'edit', 'submit'].includes(current);
+  const calendarPanel = current==='home'?'<section class="home-calendar-panel" aria-label="학사 일정"><span class="eyebrow">SCHOOL CALENDAR</span><div class="calendar-panel-heading"><h2>학사 일정</h2><a href="#calendar">전체 보기 ↗</a></div><div id="home-calendar" class="calendar-compact"></div></section>':'';
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
   <header class="topbar profile-topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
   <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#home?list=1" class="archive-nav-link ${current==='home'&&route().params.get('list')==='1'?'active':''}">학교의 모든 이야기</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
@@ -54,7 +56,7 @@ function shell() {
   <a class="contact-float" href="#contact" aria-label="관리자에게 문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H7l-5 3 1.5-6A8 8 0 0 1 3 11a9 9 0 0 1 18 0Z"/><path d="M7 10h10M7 14h6"/></svg><span>문의하기</span></a>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
   ${!client ? '<div class="preview-strip"><span></span> 디자인 미리보기 <i>·</i> 예시 문서로 구성되어 있습니다. <a href="#about">프로젝트 알아보기 ↗</a></div>' : ''}
-  <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="많이 본 문서"><div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">로그인 계정당 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
+  <main id="main" tabindex="-1"><div class="${ranked ? 'ranked-layout' : ''}"><div class="wrap" id="content"><p class="loading">기록을 펼치는 중…</p></div>${ranked ? '<aside class="popular-sidebar" aria-label="학교 소식과 많이 본 문서">' + calendarPanel + '<div class="popular-panel"><span class="eyebrow">POPULAR THIS WEEK</span><h2>많이 본 문서 <span>TOP 5</span></h2><p class="popular-period">최근 7일 · 오늘 포함</p><div id="popular-documents"><p class="muted">순위를 불러오는 중…</p></div><p class="popular-footnote">로그인 계정당 문서별 하루 1회 집계</p></div></aside>' : ''}</div></main>
   <footer><div class="wrap footer-top"><a class="brand" href="#home"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a><p>오늘의 경험이 내일의 길잡이가 되도록.<br>학생이 기록하고, 함께 이어가는 우리 학교의 위키.</p><a class="school-homepage" href="${schoolHomepage}" target="_blank" rel="noopener noreferrer" aria-label="동산고 공식 홈페이지 (새 탭)">동산고 공식 홈페이지 <span aria-hidden="true">↗</span></a><div><a href="#about">프로젝트 소개</a><a href="#guide">이용 안내</a><a href="#contact">관리자에게 문의</a></div></div><div class="wrap footer-bottom"><span>© DONGSAN WIKI · 학생 주도 비공식 프로젝트</span><span>사실을 기록하고, 출처를 남기고, 서로를 존중합니다.</span></div></footer>`;
   $('.skip').addEventListener('click', event => { event.preventDefault(); $('#main').focus(); $('#main').scrollIntoView(); });
 
@@ -78,12 +80,13 @@ function sidebar(active) {
 async function render() {
   releaseAttachmentUrls();
   releaseVerificationUrls();
-  const publicRoutes=['verify','home','page','qna','qna-question','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
+  const publicRoutes=['verify','home','page','qna','qna-question','calendar','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
   if(session&&needsVerification(profile)&&!publicRoutes.includes(route().name)){go('#verify');return;}
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
   shell();
   renderPopularDocuments(client, $('#popular-documents'), ['edit', 'submit'].includes(route().name));
+  if(route().name==='home')mountCalendar({client,container:$('#home-calendar'),profile,compact:true,isCurrent:()=>token===generation});
   window.scrollTo({ top: 0, behavior: 'instant' });
   const content = $('#content');
   const { name, params } = route();
@@ -91,6 +94,7 @@ async function render() {
     if (name === 'verify' || name === 'verification-review') await verificationView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,logout:async()=>{must(await client.auth.signOut());session=null;profile=null;go('#login');}});
     else if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') {authView(name, content);if(name==='login'&&params.get('withdrawn')==='1')notify('회원탈퇴가 완료되었습니다.');}
     else if (['profile','profile-settings','profile-password','profile-created','profile-edited','profile-withdraw'].includes(name)) await profileView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,onWithdrawn:()=>{session=null;profile=null;recovery=false;go('#login?withdrawn=1');},logout:async()=>{must(await client.auth.signOut());session=null;profile=null;recovery=false;go('#home');}});
+    else if (name === 'calendar' || name === 'calendar-manage') await calendarView({name,content,client,session,profile,isCurrent:()=>token===generation,action,notify});
     else if (name === 'guide' || name === 'about') infoView(name, content);
     else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (name === 'contact') await contactView(content, token, params);
