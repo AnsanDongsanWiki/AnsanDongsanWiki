@@ -10,6 +10,7 @@ import { mountAttachmentEditor, renderAttachments, releaseAttachmentUrls } from 
 import { recordPageView, renderPopularDocuments } from './popular.js';
 import { verificationView, needsVerification, releaseVerificationUrls } from './verification.js';
 import { mountCalendar, calendarView } from './calendar.js';
+import { campusHeroMarkup, campusView } from './campus.js';
 
 const app = document.querySelector('#app');
 const url = import.meta.env.VITE_SUPABASE_URL;
@@ -80,7 +81,7 @@ function sidebar(active) {
 async function render() {
   releaseAttachmentUrls();
   releaseVerificationUrls();
-  const publicRoutes=['verify','home','page','qna','qna-question','calendar','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
+  const publicRoutes=['verify','home','page','qna','qna-question','calendar','campus','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
   if(session&&needsVerification(profile)&&!publicRoutes.includes(route().name)){go('#verify');return;}
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
@@ -94,6 +95,7 @@ async function render() {
     if (name === 'verify' || name === 'verification-review') await verificationView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,logout:async()=>{must(await client.auth.signOut());session=null;profile=null;go('#login');}});
     else if (name === 'login' || name === 'signup' || name === 'forgot' || name === 'reset') {authView(name, content);if(name==='login'&&params.get('withdrawn')==='1')notify('회원탈퇴가 완료되었습니다.');}
     else if (['profile','profile-settings','profile-password','profile-created','profile-edited','profile-withdraw'].includes(name)) await profileView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify,refreshProfile,onWithdrawn:()=>{session=null;profile=null;recovery=false;go('#login?withdrawn=1');},logout:async()=>{must(await client.auth.signOut());session=null;profile=null;recovery=false;go('#home');}});
+    else if (name === 'campus' || name === 'campus-manage') await campusView({name,params,content,client,session,profile,isCurrent:()=>token===generation,action,notify});
     else if (name === 'calendar' || name === 'calendar-manage') await calendarView({name,content,client,session,profile,isCurrent:()=>token===generation,action,notify});
     else if (name === 'guide' || name === 'about') infoView(name, content);
     else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
@@ -123,8 +125,8 @@ async function homeView(content, params, token) {
   if (page > 0 && !pages.length) { go(listingUrl(state, {page:0})); return; }
   const filtering = !!category || !!query;
   content.className = 'wrap home-content';
-  content.innerHTML = `<section class="hero"><div class="hero-copy"><span class="eyebrow"><span class="tiny-line"></span> OUR DAYS, OUR ARCHIVE</span><h1>동산의 하루가,<br>우리의 <span class="hero-word">기록</span>이 되다.</h1><p>처음이라 궁금한 것부터, 오래 기억하고 싶은 순간까지.<br>동산인이 함께 쓰는 가장 가까운 학교생활 안내서.</p><a href="#guide" class="text-link">동산위키가 처음이라면 ${icon('arrow', 19)}</a><div class="hero-signature"><span>기록은 남고, 이야기는 이어지니까.</span><span class="signature-line"></span></div></div>
-  <figure class="hero-scripture"><blockquote>&quot;너희는 세상에 빛이라<br>산 위에 있는 동네가<br>숨겨지지 못할 것이요&quot;</blockquote><figcaption>마태복음 5:14</figcaption></figure>
+  content.innerHTML = `<section class="hero"><div class="hero-copy"><span class="eyebrow"><span class="tiny-line"></span> OUR DAYS, OUR ARCHIVE</span><h1>동산의 하루가,<br>우리의 <span class="hero-word">기록</span>이 되다.</h1><p>처음이라 궁금한 것부터, 오래 기억하고 싶은 순간까지.<br>동산인이 함께 쓰는 가장 가까운 학교생활 안내서.</p><a href="#guide" class="text-link">동산위키가 처음이라면 ${icon('arrow', 19)}</a><div class="hero-signature hero-verse"><span>&quot;너희는 세상에 빛이라 산 위에 있는 동네가 숨겨지지 못할 것이요&quot;<cite>마태복음 5:14</cite></span></div></div>
+  ${campusHeroMarkup()}
   <div class="hero-bottom"><span class="hero-bottom-label">우리 학교가 궁금할 때</span><form class="search" id="search">${icon('search', 23)}<input name="q" aria-label="문서 제목 검색" maxlength="120" placeholder="궁금한 동산의 이야기를 검색해 보세요" value="${e(query)}"><kbd aria-hidden="true">Enter ↵</kbd><button class="primary" aria-label="검색">${icon('arrow', 23)}</button></form><div class="quick-search"><span>빠르게 찾기</span><button data-query="기숙사">기숙사</button><button data-query="동아리">동아리</button><button data-query="신입생">신입생 안내</button></div></div></section>
   <section class="category-section" aria-label="주제별 바로가기"><div class="category-heading"><span class="eyebrow">FIND YOUR CHAPTER</span><h2>어떤 이야기를 찾고 있나요?</h2></div><div class="category-grid">${categoryDetails.map(([cat, symbol, description, number]) => `<button class="category-tile ${cat === category ? 'selected' : ''}" data-category="${cat}"><span class="tile-top">${icon(symbol, 27)}<span>${number}</span></span><strong>${cat}</strong><span class="tile-desc">${description}</span><span class="tile-arrow">↗</span></button>`).join('')}</div></section>
   <div class="archive-layout" id="archive">${sidebar(category)}<section class="document-section"><div class="section-head"><div><span class="eyebrow">THE GROWING COLLECTION</span><h2>${e(query ? `‘${query}’ 검색 결과` : category || '차곡차곡 쌓이는 기록')} <span class="count">${count.toString().padStart(2, '0')}</span></h2></div>${session ? `<a class="button primary" href="${canEdit(profile) ? '#edit' : '#submit'}">${canEdit(profile) ? '문서 작성 +' : '문서 작성·제출 +'}</a>` : filtering ? `<a class="text-link" href="${e(listingUrl(state, {category:'', query:'', page:0}))}">전체 문서 보기 ↗</a>` : '<span class="muted">'+ (client ? documentSortOptions[sort] : '미리보기용 예시') +'</span>'}</div>
