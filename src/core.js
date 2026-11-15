@@ -1,4 +1,4 @@
-export const categories = ['학교소개', '학교생활', '동아리', '학생회', '급식', '기타'];
+export const categories = ['학교소개', '학교생활', '동아리', '학생회', '급식', '스포츠', '기숙사', '생활권', '기타'];
 export function escapeHtml(value = '') {
   return String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 }

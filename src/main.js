@@ -1,6 +1,7 @@
 import { documentSortOptions, listingState, listingUrl, loadDocumentListing, renderListingPagination } from './listing.js';
 import { profileView } from './profile.js';
 import { qnaView } from './qna.js';
+import { boardView } from './board.js';
 import { createClient } from '@supabase/supabase-js';
 import { categories, escapeHtml as e, canEdit, safeUrl, validatePassword, linkifyText } from './core.js';
 import { icon, categoryDetails, previewPages } from './design.js';
@@ -52,7 +53,7 @@ function shell() {
   const calendarPanel = current==='home'?'<section class="home-calendar-panel" aria-label="학사 일정"><span class="eyebrow">SCHOOL CALENDAR</span><div class="calendar-panel-heading"><h2>학사 일정</h2><a href="#calendar">전체 보기 ↗</a></div><div id="home-calendar" class="calendar-compact"></div></section>':'';
   app.innerHTML = `<a class="skip" href="#main">본문으로 이동</a>
   <header class="topbar profile-topbar"><div class="wrap header"><a class="brand" href="#home" aria-label="동산위키 홈"><img class="brand-mark" src="/school-logo.png" alt="" width="44" height="44"><span>동산위키<small>DONGSAN WIKI</small></span></a>
-  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#home?list=1" class="archive-nav-link ${current==='home'&&route().params.get('list')==='1'?'active':''}">학교의 모든 이야기</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
+  <nav class="main-nav" aria-label="주 메뉴"><a href="#home" class="${current === 'home' ? 'active' : ''}">문서 둘러보기</a><a href="#qna" class="${current.startsWith('qna') ? 'active' : ''}">Q&amp;A</a><a href="#board" class="${current.startsWith('board') ? 'active' : ''}">게시판</a><a href="#guide" class="${current === 'guide' ? 'active' : ''}">처음 오셨나요?</a><a href="#about" class="${current === 'about' ? 'active' : ''}">위키 소개</a><a href="#home?list=1" class="archive-nav-link ${current==='home'&&route().params.get('list')==='1'?'active':''}">학교의 모든 이야기</a><a href="#profile" class="${current.startsWith('profile') ? 'active' : ''}">프로필</a></nav>
   ${!session ? '<nav class="actions account-actions" aria-label="계정 메뉴"><a class="login-link" href="#login">로그인 <span aria-hidden="true">↗</span></a><a class="button primary signup-link" href="#signup">함께하기</a></nav>' : ''}</div></header>
   <a class="contact-float" href="#contact" aria-label="관리자에게 문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11a8 8 0 0 1-8 8H7l-5 3 1.5-6A8 8 0 0 1 3 11a9 9 0 0 1 18 0Z"/><path d="M7 10h10M7 14h6"/></svg><span>문의하기</span></a>
   <div class="wrap"><div id="status" class="status" role="status" aria-live="polite" hidden></div></div>
@@ -81,7 +82,7 @@ function sidebar(active) {
 async function render() {
   releaseAttachmentUrls();
   releaseVerificationUrls();
-  const publicRoutes=['verify','home','page','qna','qna-question','calendar','campus','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
+  const publicRoutes=['verify','home','page','qna','qna-question','board','board-post','calendar','campus','guide','about','login','forgot','reset','profile-password','profile-withdraw'];
   if(session&&needsVerification(profile)&&!publicRoutes.includes(route().name)){go('#verify');return;}
   const token = ++generation;
   document.title = '동산위키 · 안산동산고 디지털 위키';
@@ -98,6 +99,7 @@ async function render() {
     else if (name === 'campus' || name === 'campus-manage') await campusView({name,params,content,client,session,profile,isCurrent:()=>token===generation,action,notify});
     else if (name === 'calendar' || name === 'calendar-manage') await calendarView({name,content,client,session,profile,isCurrent:()=>token===generation,action,notify});
     else if (name === 'guide' || name === 'about') infoView(name, content);
+    else if (['board','board-write','board-mine','board-post','board-review'].includes(name)) await boardView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (['qna','qna-ask','qna-mine','qna-question','qna-review'].includes(name)) await qnaView({name,params,content,client,session,profile,isCurrent:()=>token===generation,go,action,notify});
     else if (name === 'contact') await contactView(content, token, params);
     else if (name === 'inquiries') await inquiriesView(content, token, params);
